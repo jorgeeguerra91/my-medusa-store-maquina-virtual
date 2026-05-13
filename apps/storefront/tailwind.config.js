@@ -33,6 +33,13 @@ module.exports = {
           80: "#1F2937",
           90: "#111827",
         },
+        coemColors: {
+          azulCoem: "#1A003C",
+          magentaCoem: "#C60161",
+          blancoCoem: "#FFFFFF",
+          grisCoem: "#EDEDED",
+          azul2Coem: "#31125A",
+},
       },
       borderRadius: {
         none: "0px",

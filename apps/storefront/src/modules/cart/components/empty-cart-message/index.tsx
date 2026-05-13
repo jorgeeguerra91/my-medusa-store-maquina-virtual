@@ -7,16 +7,16 @@ const EmptyCartMessage = () => {
     <div className="py-48 px-2 flex flex-col justify-center items-start" data-testid="empty-cart-message">
       <Heading
         level="h1"
-        className="flex flex-row text-3xl-regular gap-x-2 items-baseline"
+        className="flex flex-row text-coemColors-azulCoem gap-x-2 items-baseline"
       >
-        Cart
+        Carrito
       </Heading>
-      <Text className="text-base-regular mt-4 mb-6 max-w-[32rem]">
-        You don&apos;t have anything in your cart. Let&apos;s change that, use
-        the link below to start browsing our products.
+      <Text className="text-coemColors-azulCoem mt-4 mb-6 max-w-[32rem]">
+        No tienes nada en tu carrito. Cambiemos eso!!, Usa el link debajo
+        para encontrar tus productos.
       </Text>
       <div>
-        <InteractiveLink href="/store">Explore products</InteractiveLink>
+        <InteractiveLink href="/store">Explorar productos</InteractiveLink>
       </div>
     </div>
   )

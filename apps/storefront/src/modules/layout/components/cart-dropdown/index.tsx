@@ -82,10 +82,10 @@ const CartDropdown = ({
       <Popover className="relative h-full">
         <PopoverButton className="h-full">
           <LocalizedClientLink
-            className="hover:text-ui-fg-base"
+            className="text-coemColors-azulCoem hover:opacity-70"
             href="/cart"
             data-testid="nav-cart-link"
-          >{`Cart (${totalItems})`}</LocalizedClientLink>
+          >{`Carrito (${totalItems})`}</LocalizedClientLink>
         </PopoverButton>
         <Transition
           show={cartDropdownOpen}
@@ -103,7 +103,7 @@ const CartDropdown = ({
             data-testid="nav-cart-dropdown"
           >
             <div className="p-4 flex items-center justify-center">
-              <h3 className="text-large-semi">Cart</h3>
+              <h3 className="text-large-semi">Carrito</h3>
             </div>
             {cartState && cartState.items?.length ? (
               <>
@@ -205,15 +205,15 @@ const CartDropdown = ({
             ) : (
               <div>
                 <div className="flex py-16 flex-col gap-y-4 items-center justify-center">
-                  <div className="bg-gray-900 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
+                  <div className="border-2 border-coemColors-azulCoem text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-coemColors-azulCoem">
                     <span>0</span>
                   </div>
-                  <span>Your shopping bag is empty.</span>
+                  <span className="text-coemColors-azulCoem">Tu carrito esta vacio.</span>
                   <div>
                     <LocalizedClientLink href="/store">
                       <>
                         <span className="sr-only">Go to all products page</span>
-                        <Button onClick={close}>Explore products</Button>
+                        <Button onClick={close} className="bg-white hover:bg-white hover:opacity-70 border-2 border-coemColors-magentaCoem text-coemColors-magentaCoem">Explorar productos</Button>
                       </>
                     </LocalizedClientLink>
                   </div>
