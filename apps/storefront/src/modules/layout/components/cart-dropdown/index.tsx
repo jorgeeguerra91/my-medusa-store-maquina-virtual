@@ -205,7 +205,7 @@ const CartDropdown = ({
             ) : (
               <div>
                 <div className="flex py-16 flex-col gap-y-4 items-center justify-center">
-                  <div className="border-2 border-coemColors-azulCoem text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-coemColors-azulCoem">
+                  <div className="border-2 border-coemColors-magentaCoem text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-coemColors-azulCoem">
                     <span>0</span>
                   </div>
                   <span className="text-coemColors-azulCoem">Tu carrito esta vacio.</span>
@@ -213,7 +213,7 @@ const CartDropdown = ({
                     <LocalizedClientLink href="/store">
                       <>
                         <span className="sr-only">Go to all products page</span>
-                        <Button onClick={close} className="bg-white hover:bg-white hover:opacity-70 border-2 border-coemColors-magentaCoem text-coemColors-magentaCoem">Explorar productos</Button>
+                        <Button onClick={close} className="bg-white !text-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem">Explorar productos</Button>
                       </>
                     </LocalizedClientLink>
                   </div>

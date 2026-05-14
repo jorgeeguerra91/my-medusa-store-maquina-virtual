@@ -9,18 +9,18 @@ const Hero = () => {
             level="h1"
             className="text-3xl leading-10 text-ui-fg-base font-normal"
           >
-            Ecommerce Starter Template
+            COEM
           </Heading>
           <Heading
             level="h2"
-            className="text-3xl leading-10 text-ui-fg-subtle font-normal"
+            className="text-3xl leading-10  font-normal text-coemColors-azulCoem"
           >
-            Powered by Medusa and Next.js
+            Controles Empresariales
           </Heading>
         </span>
-        <a href="https://github.com/medusajs/dtc-starter" target="_blank">
+        <a href="https://github.com/jorgeeguerra91/my-medusa-store-maquina-virtual" target="_blank">
           <Button variant="secondary">
-            View on GitHub <Github />
+            Repositorio de este proyecto <Github />
           </Button>
         </a>
       </div>
@@ -29,3 +29,5 @@ const Hero = () => {
 };
 
 export default Hero;
+
+
