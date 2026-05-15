@@ -58,7 +58,7 @@ export default async function Footer() {
                           href={`/categories/${c.handle}`}
                           data-testid="category-link"
                         >
-                          {c.name === "Shirts" ? "Licencias" : c.name}
+                          {c.name} {/*Con esto cambiamos las categorias el front */}
                         </LocalizedClientLink>
                         {children && (
                           <ul className="grid grid-cols-1 ml-3 gap-2">
