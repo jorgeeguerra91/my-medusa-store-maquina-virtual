@@ -26,7 +26,7 @@ export default async function Footer() {
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
               <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus text-coemColors-azulCoem">
+                <span className="txt-small-plus text-coemColors-magentaCoem">
                   Categorias
                 </span>
                 <ul
@@ -47,12 +47,12 @@ export default async function Footer() {
 
                     return (
                       <li
-                        className="flex flex-col gap-2 text-ui-fg-subtle txt-small"
+                        className="flex flex-col gap-2 text-coemColors-azulCoem txt-small"
                         key={c.id}
                       >
                         <LocalizedClientLink
                           className={clx(
-                            "hover:text-ui-fg-base",
+                            "hover:opacity-70 active:text-coemColors-magentaCoem active:opacity-100",
                             children && "txt-small-plus"
                           )}
                           href={`/categories/${c.handle}`}
@@ -89,7 +89,7 @@ export default async function Footer() {
                 </span>
                 <ul
                   className={clx(
-                    "grid grid-cols-1 gap-2 text-coemColors-azulCoem txt-small",
+                    "grid grid-cols-1 gap-2",
                     {
                       "grid-cols-2": (collections?.length || 0) > 3,
                     }
@@ -109,19 +109,19 @@ export default async function Footer() {
               </div>
             )}
             <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">Medusa</span>
-              <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
+              <span className="txt-small-plus text-coemColors-magentaCoem">COEM</span>
+              <ul className="txt-small-plus hover:opacity-70 active:text-coemColors-magentaCoem active:opacity-100">
                 <li>
                   <a
                     href="https://github.com/medusajs"
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-ui-fg-base"
+                    className="hover:opacity-70 active:text-coemColors-magentaCoem active:opacity-100"
                   >
-                    GitHub
+                    Sitio oficial
                   </a>
                 </li>
-                <li>
+                {/*<li>
                   <a
                     href="https://docs.medusajs.com"
                     target="_blank"
@@ -130,8 +130,8 @@ export default async function Footer() {
                   >
                     Documentacion
                   </a>
-                </li>
-                <li>
+                </li>*/}
+                {/*<li>
                   <a
                     href="https://github.com/medusajs/dtc-starter"
                     target="_blank"
@@ -140,7 +140,7 @@ export default async function Footer() {
                   >
                     Pagina oficial
                   </a>
-                </li>
+                </li>*/}
               </ul>
             </div>
           </div>
