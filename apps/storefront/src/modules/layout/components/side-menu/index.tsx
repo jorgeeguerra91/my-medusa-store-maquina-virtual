@@ -13,10 +13,10 @@ import { Locale } from "@lib/data/locales"
 
 
 const SideMenuItems = {
-  Home: "/",
-  Store: "/store",
-  Account: "/account",
-  Cart: "/cart",
+  Inicio: "/",
+  Tienda: "/store",
+  Cuenta: "/account",
+  Carrito: "/cart",
 }
 
 type SideMenuProps = {
@@ -52,7 +52,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                 />
               )}
 
-              <Transition
+              <Transition 
                 show={open}
                 as={Fragment}
                 enter="transition ease-out duration-150"

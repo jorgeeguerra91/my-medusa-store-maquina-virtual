@@ -18,16 +18,16 @@ export default async function Footer() {
           <div>
             <LocalizedClientLink
               href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
+              className="txt-compact-xlarge-plus text-coemColors-azulCoem hover:text-ui-fg-base uppercase"
             >
-              Medusa Store
+              Controles Empresariales Store
             </LocalizedClientLink>
           </div>
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
               <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Categories
+                <span className="txt-small-plus text-coemColors-azulCoem">
+                  Categorias
                 </span>
                 <ul
                   className="grid grid-cols-1 gap-2"
@@ -58,7 +58,7 @@ export default async function Footer() {
                           href={`/categories/${c.handle}`}
                           data-testid="category-link"
                         >
-                          {c.name}
+                          {c.name === "Shirts" ? "Licencias" : c.name}
                         </LocalizedClientLink>
                         {children && (
                           <ul className="grid grid-cols-1 ml-3 gap-2">
@@ -84,12 +84,12 @@ export default async function Footer() {
             )}
             {collections && collections.length > 0 && (
               <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Collections
+                <span className="txt-small-plus text-coemColors-azulCoem">
+                  Colecciones
                 </span>
                 <ul
                   className={clx(
-                    "grid grid-cols-1 gap-2 text-ui-fg-subtle txt-small",
+                    "grid grid-cols-1 gap-2 text-coemColors-azulCoem txt-small",
                     {
                       "grid-cols-2": (collections?.length || 0) > 3,
                     }
@@ -98,7 +98,7 @@ export default async function Footer() {
                   {collections?.slice(0, 6).map((c) => (
                     <li key={c.id}>
                       <LocalizedClientLink
-                        className="hover:text-ui-fg-base"
+                        className="hover:text-coemColors-azulCoem"
                         href={`/collections/${c.handle}`}
                       >
                         {c.title}
@@ -128,7 +128,7 @@ export default async function Footer() {
                     rel="noreferrer"
                     className="hover:text-ui-fg-base"
                   >
-                    Documentation
+                    Documentacion
                   </a>
                 </li>
                 <li>
@@ -138,7 +138,7 @@ export default async function Footer() {
                     rel="noreferrer"
                     className="hover:text-ui-fg-base"
                   >
-                    Source code
+                    Pagina oficial
                   </a>
                 </li>
               </ul>
