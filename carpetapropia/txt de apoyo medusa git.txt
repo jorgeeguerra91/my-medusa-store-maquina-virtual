@@ -1,0 +1,43 @@
+cd apps/backend o storefront
+npm run dev //Iniciar dev
+matar address|> backend>netstat -ano | findstr :9000
+	     |> taskkill /PID 32600 /F
+ 
+git status → muestra archivos modificados
+git add . → prepara todos los cambios
+git commit -m "mensaje" → guarda una versión local
+git push → sube cambios a GitHub
+git pull → trae cambios desde GitHub
+git log → muestra historial de commits
+git diff → muestra cambios en archivos
+git remote -v → muestra conexión remota
+git branch → muestra ramas
+git checkout rama → cambia de rama
+git checkout -b rama → crea y cambia a nueva rama
+git clone URL → descarga repositorio
+
+
+Borrar cache de storefront mediante powershell| Remove-Item -Recurse -Force .next
+(Bajar servidor antes de ejecutar y subir con npm run dev otra vez)
+
+
+
+GET /test?nombre=Jorge
+
+integraciones
+cambio de diseño
+crm
+business
+SharePoint
+
+
+agregar inventario de hardware, 20 artículos para pedido
+configurar colores
+
+
+
+
+
+
+
+QAZ321plm*2024
