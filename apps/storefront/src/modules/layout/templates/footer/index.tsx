@@ -18,9 +18,12 @@ export default async function Footer() {
           <div>
             <LocalizedClientLink
               href="/"
-              className="txt-compact-xlarge-plus text-coemColors-azulCoem hover:text-ui-fg-base uppercase"
+              className="txt-compact-xlarge-plus text-coemColors-azulCoem hover:text-ui-fg-base uppercase hover:opacity-70"
             >
-              Controles Empresariales Store
+              Controles Empresariales{" "}
+  <span className="text-coemColors-magentaCoem">
+    Store
+  </span>
             </LocalizedClientLink>
           </div>
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
@@ -113,7 +116,7 @@ export default async function Footer() {
               <ul className="txt-small-plus hover:opacity-70 active:text-coemColors-magentaCoem active:opacity-100">
                 <li>
                   <a
-                    href="https://github.com/medusajs"
+                    href="https://www.controlesempresariales.com/"
                     target="_blank"
                     rel="noreferrer"
                     className="hover:opacity-70 active:text-coemColors-magentaCoem active:opacity-100"

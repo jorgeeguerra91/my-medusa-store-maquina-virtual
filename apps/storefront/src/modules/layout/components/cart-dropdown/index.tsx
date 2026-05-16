@@ -151,7 +151,7 @@ const CartDropdown = ({
                                   data-testid="cart-item-quantity"
                                   data-value={item.quantity}
                                 >
-                                  Quantity: {item.quantity}
+                                  Cantidad: {item.quantity}
                                 </span>
                               </div>
                               <div className="flex justify-end">
@@ -165,10 +165,10 @@ const CartDropdown = ({
                           </div>
                           <DeleteButton
                             id={item.id}
-                            className="mt-1"
+                            className="mt-1 hover:text-coemColors-magentaCoem"
                             data-testid="cart-item-remove-button"
                           >
-                            Remove
+                            Eliminar
                           </DeleteButton>
                         </div>
                       </div>
@@ -178,7 +178,7 @@ const CartDropdown = ({
                   <div className="flex items-center justify-between">
                     <span className="text-ui-fg-base font-semibold">
                       Subtotal{" "}
-                      <span className="font-normal">(excl. taxes)</span>
+                      <span className="font-normal">(excl. impuestos)</span>
                     </span>
                     <span
                       className="text-large-semi"
@@ -193,11 +193,11 @@ const CartDropdown = ({
                   </div>
                   <LocalizedClientLink href="/cart" passHref>
                     <Button
-                      className="w-full"
+                      className="w-full bg-white !text-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem"
                       size="large"
                       data-testid="go-to-cart-button"
                     >
-                      Go to cart
+                      Ir al carrito
                     </Button>
                   </LocalizedClientLink>
                 </div>
@@ -212,8 +212,9 @@ const CartDropdown = ({
                   <div>
                     <LocalizedClientLink href="/store">
                       <>
-                        <span className="sr-only">Go to all products page</span>
-                        <Button onClick={close} className="bg-white !text-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem">Explorar productos</Button>
+                        <span className="sr-only">Ir a la pagina de productos</span>
+                        <Button onClick={close} className="bg-white !text-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem"
+                        >Explorar productos</Button>
                       </>
                     </LocalizedClientLink>
                   </div>
