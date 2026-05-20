@@ -63,7 +63,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
 
   const currentInfo = useMemo(() => {
     if (!billingAddress) {
-      return "No billing address"
+      return "Sin direccion de facturacion"
     }
 
     const country =
@@ -93,7 +93,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
     <form action={formAction} onReset={() => clearState()} className="w-full">
       <input type="hidden" name="addressId" value={billingAddress?.id} />
       <AccountInfo
-        label="Billing address"
+        label="Direccion de facturacion"
         currentInfo={currentInfo}
         isSuccess={successState}
         isError={!!state.error}
@@ -124,7 +124,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
             data-testid="billing-company-input"
           />
           <Input
-            label="Phone"
+            label="Telefono"
             name="phone"
             type="phone"
             autoComplete="phone"

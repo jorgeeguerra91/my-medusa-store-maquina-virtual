@@ -17,7 +17,7 @@ export default async function Footer() {
         <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
           <div>
             <LocalizedClientLink
-              href="/"
+              href="/store"
               className="txt-compact-xlarge-plus text-coemColors-azulCoem hover:text-ui-fg-base uppercase hover:opacity-70"
             >
               Controles Empresariales{" "}
@@ -150,7 +150,8 @@ export default async function Footer() {
         </div>
         <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
           <Text className="txt-compact-small">
-            © {new Date().getFullYear()} Medusa Store. All rights reserved.
+            © {new Date().getFullYear()} Controles Empresariales. Todos los derechos
+                        reservados.
           </Text>
           <MedusaCTA />
         </div>
