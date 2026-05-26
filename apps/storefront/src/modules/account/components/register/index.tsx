@@ -29,7 +29,7 @@ const Register = ({ setCurrentView }: Props) => {
       <form className="w-full flex flex-col" action={formAction}>
         <div className="flex flex-col w-full gap-y-2">
           <Input
-            label="Primer nombre"
+            label="Nombre"
             name="first_name"
             required
             autoComplete="given-name"

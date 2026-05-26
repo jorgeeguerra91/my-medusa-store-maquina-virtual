@@ -99,7 +99,7 @@ const ShippingAddress = ({
       {customer && (addressesInRegion?.length || 0) > 0 && (
         <Container className="mb-6 flex flex-col gap-y-4 p-5">
           <p className="text-small-regular">
-            {`Hi ${customer.first_name}, do you want to use one of your saved addresses?`}
+            {`Hola ${customer.first_name}, quieres usar una de tus direcciones guardadas?`}
           </p>
           <AddressSelect
             addresses={customer.addresses}
@@ -114,7 +114,7 @@ const ShippingAddress = ({
       )}
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="Primer nombre"
+          label="Nombre"
           name="shipping_address.first_name"
           autoComplete="given-name"
           value={formData["shipping_address.first_name"]}

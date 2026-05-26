@@ -129,7 +129,7 @@ const EditAddress: React.FC<EditAddressProps> = ({
             <div className="grid grid-cols-1 gap-y-2">
               <div className="grid grid-cols-2 gap-x-2">
                 <Input
-                  label="First name"
+                  label="s name"
                   name="first_name"
                   required
                   autoComplete="given-name"
