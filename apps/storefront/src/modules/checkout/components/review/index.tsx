@@ -15,10 +15,9 @@ const Review = ({ cart }: { cart: HttpTypes.StoreCart }) => {
     (cart as unknown as Record<string, unknown>)?.gift_cards && ((cart as unknown as Record<string, unknown>)?.gift_cards as unknown[])?.length > 0 && cart?.total === 0
   )
 
-  const previousStepsCompleted =
-    cart.shipping_address &&
-    (cart.shipping_methods?.length ?? 0) > 0 &&
-    (cart.payment_collection || paidByGiftcard)
+const previousStepsCompleted =
+  cart.shipping_address &&
+  (cart.payment_collection || paidByGiftcard)
 
   return (
     <div className="bg-white">

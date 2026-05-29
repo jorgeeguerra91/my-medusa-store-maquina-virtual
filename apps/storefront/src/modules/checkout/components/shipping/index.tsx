@@ -67,7 +67,16 @@ const Shipping: React.FC<ShippingProps> = ({
   const router = useRouter()
   const pathname = usePathname()
 
-  const isOpen = searchParams.get("step") === "delivery"
+
+ const isOpen = searchParams.get("step") === "delivery"
+
+const requiresShipping = cart.items?.some(
+  (item) => item.requires_shipping
+)
+
+if (!requiresShipping) {
+  return null
+}
 
   const _shippingMethods = availableShippingMethods?.filter(
     (sm) => (sm as unknown as { service_zone?: { fulfillment_set?: { type?: string; location?: { address: HttpTypes.StoreCartAddress } } } }).service_zone?.fulfillment_set?.type !== "pickup"
@@ -376,7 +385,10 @@ const Shipping: React.FC<ShippingProps> = ({
               className="mt"
               onClick={handleSubmit}
               isLoading={isLoading}
-              disabled={!cart.shipping_methods?.[0]}
+              disabled={
+  requiresShipping &&
+  !cart.shipping_methods?.length
+}
               data-testid="submit-delivery-option-button"
             >
               Continuar con el pago
