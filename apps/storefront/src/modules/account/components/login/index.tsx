@@ -1,4 +1,5 @@
-import { login } from "@lib/data/customer"
+import { login, setGoogleAuthToken } from "@lib/data/customer"
+import { sdk } from "@lib/config"
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
@@ -12,15 +13,40 @@ type Props = {
 const Login = ({ setCurrentView }: Props) => {
   const [message, formAction] = useActionState(login, null)
 
+  const loginWithGoogle = async () => {
+    try {
+      const result = await sdk.auth.login("customer", "google", {})
+
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        "location" in result &&
+        typeof result.location === "string"
+      ) {
+        window.location.href = result.location
+        return
+      }
+
+      if (typeof result === "string") {
+        await setGoogleAuthToken(result)
+        window.location.href = "/co/account"
+      }
+    } catch (error) {
+      console.error("Google login error:", error)
+    }
+  }
+
   return (
     <div
       className="max-w-sm w-full flex flex-col items-center"
       data-testid="login-page"
     >
       <h1 className="text-large-semi uppercase mb-6">Bienvenido de vuelta</h1>
+
       <p className="text-center text-base-regular text-ui-fg-base mb-8">
         Inicia sesión para acceder a una experiencia de compra completa.
       </p>
+
       <form className="w-full" action={formAction}>
         <div className="flex flex-col w-full gap-y-2">
           <Input
@@ -32,6 +58,7 @@ const Login = ({ setCurrentView }: Props) => {
             required
             data-testid="email-input"
           />
+
           <Input
             label="contraseña"
             name="password"
@@ -41,11 +68,22 @@ const Login = ({ setCurrentView }: Props) => {
             data-testid="password-input"
           />
         </div>
+
         <ErrorMessage error={message} data-testid="login-error-message" />
+
         <SubmitButton data-testid="sign-in-button" className="w-full mt-6">
           Iniciar sesion
         </SubmitButton>
       </form>
+
+      <button
+        type="button"
+        onClick={loginWithGoogle}
+        className="w-full mt-4 border border-ui-border-base rounded-md py-3"
+      >
+        Continuar con Google
+      </button>
+
       <span className="text-center text-ui-fg-base text-small-regular mt-6">
         No estas registrado?{" "}
         <button

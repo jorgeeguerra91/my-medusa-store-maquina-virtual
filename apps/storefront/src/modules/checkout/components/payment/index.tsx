@@ -191,7 +191,7 @@ const Payment = ({
 
           <Button
             size="large"
-            className="mt-6"
+            className="mt-6 bg-white !text-coemColors-azulCoem border-2 border-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white"
             onClick={handleSubmit}
             isLoading={isLoading}
             disabled={

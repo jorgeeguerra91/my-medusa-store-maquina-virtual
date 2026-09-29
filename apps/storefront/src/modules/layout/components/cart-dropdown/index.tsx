@@ -99,7 +99,7 @@ const CartDropdown = ({
         >
           <PopoverPanel
             static
-            className="hidden small:block absolute top-[calc(100%+1px)] right-0 bg-white border-x border-b border-gray-200 w-[420px] text-ui-fg-base"
+            className="hidden small:block absolute top-[calc(100%+30px)] right-0 bg-white border-x border-b border-gray-200 w-[420px] text-ui-fg-base"
             data-testid="nav-cart-dropdown"
           >
             <div className="p-4 flex items-center justify-center">
@@ -193,7 +193,7 @@ const CartDropdown = ({
                   </div>
                   <LocalizedClientLink href="/cart" passHref>
                     <Button
-                      className="w-full bg-white !text-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem"
+                      className="w-full bg-white !text-coemColors-azulCoem hover:!bg-coemColors-magentaCoem hover:!text-white border-2 border-coemColors-magentaCoem"
                       size="large"
                       data-testid="go-to-cart-button"
                     >

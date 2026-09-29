@@ -21,7 +21,7 @@ const OrderDetails = ({ order, showStatus }: OrderDetailsProps) => {
       // Payment
       pending: "Pendiente",
       authorized: "Autorizado",
-      captured: "Pagado",
+      captured: "Procesado",
       partially_refunded: "Reembolso parcial",
       refunded: "Reembolsado",
     }
@@ -51,7 +51,7 @@ const OrderDetails = ({ order, showStatus }: OrderDetailsProps) => {
       <Text className="mt-2">
         Fecha de orden:{" "}
         <span data-testid="order-date">
-          {new Date(order.created_at).toDateString()}
+          {new Date(order.created_at).toLocaleDateString()}
         </span>
       </Text>
 

@@ -259,3 +259,11 @@ export const updateCustomerAddress = async (
       return { success: false, error: err.toString() }
     })
 }
+export async function setGoogleAuthToken(token: string) {
+  await setAuthToken(token)
+
+  const customerCacheTag = await getCacheTag("customers")
+  revalidateTag(customerCacheTag)
+
+  await transferCart()
+}

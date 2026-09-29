@@ -100,7 +100,7 @@ const Addresses = ({
               </div>
             )}
 
-            <SubmitButton className="mt-6" data-testid="submit-address-button">
+            <SubmitButton className="mt-6 bg-white !text-coemColors-azulCoem border-2 border-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white" data-testid="submit-address-button">
               Continuar con el envio
             </SubmitButton>
 

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="400"
+   height="300"
+   viewBox="0 0 105.83333 79.375"
+   version="1.1"
+   id="svg8"
+   inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)"
+   sodipodi:docname="windows-defender.svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.4"
+     inkscape:cx="192.16514"
+     inkscape:cy="182.83806"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     inkscape:document-rotation="0"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     units="px"
+     inkscape:window-width="1920"
+     inkscape:window-height="1051"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-264.13,-68.753868)">
+    <g
+       id="g889"
+       transform="matrix(0.57528959,0,0,0.57528959,112.17877,29.200481)">
+      <g
+         id="g879">
+        <rect
+           style="opacity:1;fill:#1378d4;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.88819;paint-order:markers fill stroke"
+           id="rect866"
+           width="184.14999"
+           height="138.44562"
+           x="264.13"
+           y="68.753868" />
+        <path
+           id="rect847"
+           style="fill:#ffffff;fill-rule:evenodd;stroke:none;stroke-width:1.35654;paint-order:markers fill stroke"
+           d="m 360.77734,91.353727 c 10.85061,1.495784 9.93238,8.899643 28.52315,8.088331 l -0.26727,20.755462 h -28.25588 z"
+           sodipodi:nodetypes="ccccc" />
+        <path
+           style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+           d="m 360.41406,157.68902 v -33.00779 h 28.26375 c -3.52794,14.21713 -14.29786,24.68454 -28.26375,33.00779 z"
+           id="path850"
+           sodipodi:nodetypes="cccc" />
+        <path
+           id="path856"
+           style="fill:#ffffff;fill-rule:evenodd;stroke:none;stroke-width:1.35654;paint-order:markers fill stroke"
+           d="m 355.7103,91.353727 c -10.85061,1.495784 -9.93238,8.899643 -28.52316,8.088331 l 0.26727,20.755462 h 28.25589 z"
+           sodipodi:nodetypes="ccccc" />
+        <path
+           style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+           d="m 356.07358,157.68902 v -33.00779 h -28.26376 c 3.52794,14.21713 14.29787,24.68454 28.26376,33.00779 z"
+           id="path858"
+           sodipodi:nodetypes="cccc" />
+        <text
+           xml:space="preserve"
+           style="font-size:17.0411px;line-height:1.25;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:0px;word-spacing:0px;fill:#ffffff;stroke-width:0.710048"
+           x="286.49927"
+           y="180.51756"
+           id="text864"><tspan
+             sodipodi:role="line"
+             id="tspan862"
+             x="286.49927"
+             y="180.51756"
+             style="fill:#ffffff;stroke-width:0.710048">Windows Defender</tspan></text>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -185,6 +185,8 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
         onClick={handlePayment}
         size="large"
         data-testid="submit-order-button"
+        className="mt-6 bg-white !text-coemColors-azulCoem border-2 border-coemColors-magentaCoem hover:!bg-coemColors-magentaCoem hover:!text-white"
+        
       >
         Realizar pedido
       </Button>

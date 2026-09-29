@@ -7,6 +7,8 @@ import Refresh from "@modules/common/icons/refresh"
 import Accordion from "./accordion"
 import { HttpTypes } from "@medusajs/types"
 
+
+
 type ProductTabsProps = {
   product: HttpTypes.StoreProduct
 }
@@ -42,35 +44,32 @@ const ProductTabs = ({ product }: ProductTabsProps) => {
 }
 
 const ProductInfoTab = ({ product }: ProductTabsProps) => {
+  const metadata = (product.metadata ?? {}) as Record<string, any>
   return (
     <div className="text-small-regular py-8">
       <div className="grid grid-cols-2 gap-x-8">
         <div className="flex flex-col gap-y-4">
           <div>
-            <span className="font-semibold">Usuarios</span>
+            <span className="font-semibold">Referencia</span>
             <p>{product.material ? product.material : "-"}</p>
           </div>
           <div>
-            <span className="font-semibold">Pais de origen</span>
+            <span className="font-semibold">Fabricante</span>
             <p>{product.origin_country ? product.origin_country : "-"}</p>
           </div>
           <div>
-            <span className="font-semibold">Version</span>
-            <p>{product.type ? product.type.value : "-"}</p>
+            <span className="font-semibold">Categoría</span>
+            <p>{metadata.categoria || "-"}</p>
           </div>
         </div>
         <div className="flex flex-col gap-y-4">
           <div>
-            <span className="font-semibold">Dispositivos</span>
-            <p>{product.weight ? `${product.weight} g` : "-"}</p>
+            <span className="font-semibold">Vigencia</span>
+            <p>{metadata.vigencia || "-"}</p>
           </div>
           <div>
-            <span className="font-semibold">Meses</span>
-            <p>
-              {product.length && product.width && product.height
-                ? `${product.length}L x ${product.width}W x ${product.height}H`
-                : "-"}
-            </p>
+            <span className="font-semibold">Informacion adicional</span>
+            <p>{metadata.informacion_adicional || "-"}</p>
           </div>
         </div>
       </div>
