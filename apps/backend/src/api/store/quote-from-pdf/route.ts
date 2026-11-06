@@ -3,19 +3,26 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 
-import {
-  createCartWorkflow,
-  addToCartWorkflow,
-} from "@medusajs/medusa/core-flows"
-
 import { PDFParse } from "pdf-parse"
+
+type PdfProduct = {
+  sku: string | null
+  description: string
+  product_title: string | null
+  quantity: number
+  unit_price_usd: number
+  subtotal_usd: number
+  tax_usd: number
+  total_usd: number
+  variant_id: string | null
+}
 
 export async function POST(
   req: MedusaRequest,
   res: MedusaResponse
 ) {
   try {
-    console.log("=== COTIZACIÓN DESDE PDF ===")
+    console.log("=== ANALIZAR COTIZACIÓN PDF ===")
 
     const archivo = (req as any).file
 
@@ -26,16 +33,15 @@ export async function POST(
       })
     }
 
-    // =========================================
+    // =====================================================
     // 1. EXTRAER TEXTO DEL PDF
-    // =========================================
+    // =====================================================
 
     const parser = new PDFParse({
       data: archivo.buffer,
     })
 
     const resultado = await parser.getText()
-
     await parser.destroy()
 
     const texto = resultado.text
@@ -44,35 +50,28 @@ export async function POST(
       .replace(/\r/g, "")
       .trim()
 
-console.log("=== TEXTO EXTRAÍDO DEL PDF ===")
-console.log(JSON.stringify(texto))
-console.log("=== TEXTO NORMALIZADO ===")
-console.log(JSON.stringify(textoNormalizado))
-console.log("=== FIN DEL TEXTO ===")
-
-    // =========================================
-    // 2. CORREO
-    // =========================================
+    // =====================================================
+    // 2. EXTRAER CORREO DEL PDF
+    // =====================================================
 
     const emailMatch = textoNormalizado.match(
-      /E-mail:\s*([^\s]+)/i
+      /(?:E[\s-]?mail|correo(?:\s+electr[oó]nico)?)\s*:?\s*([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i
     )
 
-    const email = emailMatch?.[1]?.trim()
+    const correoPdf = emailMatch?.[1]?.trim() ?? null
 
-   /* if (!email) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "No se encontró el correo del cliente en el PDF.",
-      })
-    }*/
+    console.log(
+      "¿Se encontró correo en el PDF?:",
+      Boolean(correoPdf)
+    )
 
-    console.log("EMAIL:", email)
+    // No buscamos el cliente en Medusa aquí.
+    // Solo devolvemos el correo encontrado para llenar
+    // el input del formulario en el frontend.
 
-    // =========================================
-    // 3. VIGENCIA
-    // =========================================
+    // =====================================================
+    // 3. DETECTAR VIGENCIA
+    // =====================================================
 
     const vigenciaMatch = textoNormalizado.match(
       /Validez de la oferta:\s*(\d+)\s*d[ií]as?/i
@@ -88,403 +87,256 @@ console.log("=== FIN DEL TEXTO ===")
       expirationDate.getDate() + vigenciaDias
     )
 
-    console.log(
-      "VIGENCIA:",
-      vigenciaDias,
-      "días"
+    expirationDate.setHours(23, 59, 59, 999)
+
+    // =====================================================
+    // 4. LOCALIZAR SECCIÓN DE PRODUCTOS
+    // =====================================================
+
+    const inicioSeccion = textoNormalizado.match(
+      /#PARTE\s+DESCRIPCIÓN/i
     )
 
-// 4. EXTRAER PRODUCTOS
-// La fila de precios marca el final de cada producto.
-// No dependemos de que exista SKU.
+    if (!inicioSeccion || inicioSeccion.index === undefined) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No se encontró la sección de productos en el PDF.",
+      })
+    }
 
-const inicioProductos = textoNormalizado.indexOf(
-  "#PARTE DESCRIPCIÓN"
-)
-
-if (inicioProductos === -1) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "No se encontró la sección de productos en el PDF.",
-  })
-}
-
-const textoProductos =
-  textoNormalizado.slice(inicioProductos)
-
-// Fila final de cada producto:
-// CANT. + VALOR UND. + SUBTOTAL + IMPUESTOS + TOTAL
-const patronFilaPrecios =
-  /(\d+)\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})/g
-
-const productos: any[] = []
-
-let posicionAnterior = 0
-let matchPrecio: RegExpExecArray | null
-
-while (
-  (matchPrecio =
-    patronFilaPrecios.exec(textoProductos)) !== null
-) {
-  const bloque =
-    textoProductos
-      .slice(posicionAnterior, matchPrecio.index)
-      .trim()
-
-  // Si todavía estamos en el encabezado, lo quitamos
-  const bloqueLimpio = bloque
-    .replace(
-      /^#PARTE DESCRIPCIÓN CANT\. VALOR UND\. SUBTOTAL IMPUESTOS TOTAL\s*/i,
-      ""
+    const textoProductos = textoNormalizado.slice(
+      inicioSeccion.index
     )
-    .trim()
 
-  // Buscar SKU dentro del bloque.
-  // También permite que el PDF lo separe con un salto de línea:
-  // D5BK2LT#
-  // ABM
-const skuMatch = bloqueLimpio.match(
-  /\b[A-Z0-9-]+#\s*[A-Z0-9]+\b/i
-)
+    // Formato de fila:
+    // CANTIDAD + VALOR UNITARIO + SUBTOTAL + IMPUESTO + TOTAL
+    const patronFilaPrecios =
+      /(\d+)\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})\s+\$([\d.]+,\d{2})/g
 
-  let sku: string | null = null
-  let descripcion = bloqueLimpio
+    const productosExtraidos: Omit<
+      PdfProduct,
+      "product_title" | "variant_id"
+    >[] = []
 
-  if (skuMatch) {
-    // Quitamos espacios/saltos de línea del SKU
-    sku = skuMatch[0]
-      .replace(/\s+/g, "")
-      .toUpperCase()
+    let posicionAnterior = 0
+    let matchPrecio: RegExpExecArray | null
 
-    // Eliminamos el SKU de la descripción
-    const partesSku = sku.split("#")
+    const convertirImporte = (valor: string) =>
+      Number(
+        valor
+          .replace(/\./g, "")
+          .replace(",", ".")
+      )
 
-const skuRegex = new RegExp(
-  `${partesSku[0]}#\\s*${partesSku[1]}`,
-  "gi"
-)
+    while (
+      (matchPrecio =
+        patronFilaPrecios.exec(textoProductos)) !== null
+    ) {
+      const bloque = textoProductos
+        .slice(posicionAnterior, matchPrecio.index)
+        .trim()
 
-    descripcion = descripcion.replace(
-      skuRegex,
-      ""
-    )
-  }
+      const bloqueLimpio = bloque
+        .replace(
+          /^#PARTE\s+DESCRIPCIÓN[\s\S]*?\bTOTAL\b/i,
+          ""
+        )
+        .trim()
 
-  // Limpiar espacios y saltos de línea
-  descripcion = descripcion
-    .replace(/\s+/g, " ")
-    .trim()
+      // Detectar SKU incluso cuando hay espacios o saltos
+      // de línea alrededor del signo #.
+      const skuMatch = bloqueLimpio.match(
+        /\b[A-Z0-9-]+#\s*[A-Z0-9]+\b/i
+      )
 
-const convertir = (valor: string) =>
-  Number(
-    valor
-      .replace(/\./g, "")
-      .replace(",", ".")
-  )
+      let sku: string | null = null
+      let descripcion = bloqueLimpio
 
-  productos.push({
-    sku,
-    description: descripcion,
-    quantity: Number(matchPrecio[1]),
-    unit_price_usd: convertir(matchPrecio[2]),
-    subtotal_usd: convertir(matchPrecio[3]),
-    tax_usd: convertir(matchPrecio[4]),
-    total_usd: convertir(matchPrecio[5]),
-  })
-
-  // La próxima búsqueda comienza después
-  // de la fila de precios actual
-  posicionAnterior =
-    patronFilaPrecios.lastIndex
-}
-
-console.log(
-  "=== PRODUCTOS EXTRAÍDOS ==="
-)
-console.log(
-  JSON.stringify(productos, null, 2)
-)
-
-if (!productos.length) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "No se pudieron extraer productos del PDF.",
-  })
-}
-
-// 5. BUSCAR VARIANTES POR SKU
-const query = req.scope.resolve("query")
-
-const productosConVariante: any[] = []
-
-for (const producto of productos) {
-  // Si no tiene SKU, todavía no intentamos
-  // buscarlo por variante.
-  if (!producto.sku) {
-    productosConVariante.push({
-      ...producto,
-      variant_id: null,
-    })
-
-    continue
-  }
-
-  const { data: variants } =
-    await query.graph({
-      entity: "product_variant",
-      fields: [
-        "id",
-        "sku",
-        "title",
-        "product_id",
-      ],
-      filters: {
-        sku: producto.sku,
-      },
-    })
-
-  const variante =
-    variants?.find(
-      (variant: any) =>
-        variant.sku
-          ?.trim()
-          .toUpperCase() ===
-        producto.sku
-          .trim()
+      if (skuMatch) {
+        sku = skuMatch[0]
+          .replace(/\s+/g, "")
           .toUpperCase()
-    )
 
-  if (!variante) {
-    throw new Error(
-      `No se encontró el SKU ${producto.sku} en Medusa.`
-    )
-  }
+        const partesSku = sku.split("#")
 
-  productosConVariante.push({
-    ...producto,
-    variant_id: variante.id,
-  })
-}
+        const skuRegex = new RegExp(
+          `${partesSku[0]}#\\s*${partesSku[1]}`,
+          "gi"
+        )
 
-console.log(
-  "=== PRODUCTOS CON VARIANTE ==="
-)
-console.log(
-  JSON.stringify(
-    productosConVariante,
-    null,
-    2
-  )
-)
-    // =========================================
-    // 8. OBTENER TRM ACTUAL
-    // =========================================
+        descripcion = descripcion.replace(
+          skuRegex,
+          ""
+        )
+      }
 
-    const trmResponse = await fetch(
-      "https://www.datos.gov.co/resource/ceyp-9c7c.json?$limit=1&$order=vigenciadesde%20DESC"
-    )
+      descripcion = descripcion
+        .replace(/\s+/g, " ")
+        .trim()
 
-    if (!trmResponse.ok) {
-      throw new Error(
-        "No fue posible obtener la TRM actual."
-      )
+      productosExtraidos.push({
+        sku,
+        description:
+          descripcion || "Producto sin descripción",
+        quantity: Number(matchPrecio[1]),
+        unit_price_usd: convertirImporte(matchPrecio[2]),
+        subtotal_usd: convertirImporte(matchPrecio[3]),
+        tax_usd: convertirImporte(matchPrecio[4]),
+        total_usd: convertirImporte(matchPrecio[5]),
+      })
+
+      posicionAnterior = patronFilaPrecios.lastIndex
     }
 
-    const trmData =
-      await trmResponse.json()
+    console.log(
+      "Cantidad de productos extraídos:",
+      productosExtraidos.length
+    )
 
-    const trm =
-      Number(trmData?.[0]?.valor)
-
-    if (!trm || trm <= 0) {
-      throw new Error(
-        "La TRM obtenida no es válida."
-      )
+    if (!productosExtraidos.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No se pudieron extraer productos del PDF. Verifique el formato de la tabla.",
+      })
     }
 
-    console.log("TRM:", trm)
+    // =====================================================
+    // 5. BUSCAR VARIANTES POR SKU
+    // =====================================================
 
-    // =========================================
-    // 9. BUSCAR CUSTOMER
-    // =========================================
+    const query = req.scope.resolve("query") as any
 
-    const { data: customers } =
-      await query.graph({
-        entity: "customer",
+    const productosConVariante: PdfProduct[] = []
+
+    for (const producto of productosExtraidos) {
+      // Si no existe SKU, el usuario podrá asociar
+      // manualmente el producto desde el formulario.
+      if (!producto.sku) {
+        productosConVariante.push({
+          ...producto,
+          product_title: null,
+          variant_id: null,
+        })
+
+        continue
+      }
+
+      const { data: variantes } = await query.graph({
+        entity: "product_variant",
         fields: [
           "id",
-          "email",
+          "sku",
+          "product_id",
         ],
         filters: {
-          email,
+          sku: producto.sku,
         },
       })
 
-    const customer =
-      customers?.[0]
+      const variante = variantes?.find(
+        (item: any) =>
+          item.sku?.trim().toUpperCase() ===
+          producto.sku?.trim().toUpperCase()
+      )
 
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message:
-          `No existe un cliente en Medusa con el correo ${email}.`,
-      })
-    }
+      // Que el SKU no coincida ya no detiene el análisis.
+      // El producto permanece en el formulario para
+      // que pueda asociarse manualmente.
+      if (!variante) {
+        productosConVariante.push({
+          ...producto,
+          product_title: null,
+          variant_id: null,
+        })
 
-    // =========================================
-    // 10. REGIÓN
-    // =========================================
+        continue
+      }
 
-    const { data: regions } =
-      await query.graph({
-        entity: "region",
-        fields: [
-          "id",
-          "name",
-        ],
-      })
-
-    const region =
-      regions?.[0]
-
-    if (!region) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "No existe ninguna región configurada.",
-      })
-    }
-
-    // =========================================
-    // 11. PRECIO FINAL EN COP
-    // =========================================
-
-const items =
-  productosConVariante
-    .filter((producto) => producto.variant_id)
-    .map((producto) => ({
-      variant_id: producto.variant_id,
-      quantity: producto.quantity,
-      unit_price: Math.round(
-        producto.total_usd * trm
-      ),
-    }))
-
-    // =========================================
-    // 12. CREAR CARRITO
-    // =========================================
-
-    const { result: cart } =
-      await createCartWorkflow(
-        req.scope
-      ).run({
-        input: {
-          customer_id:
-            customer.id,
-
-          region_id:
-            region.id,
-
-          items: [],
-
-          metadata: {
-            quote_source:
-              "pdf",
-
-            quote_trm:
-              trm,
-
-            quote_validity_days:
-              vigenciaDias,
-
-            quote_expires_at:
-              expirationDate.toISOString(),
-
-            quote_email:
-              email,
-          },
+      // Obtener el nombre del producto de Medusa.
+      const { data: productosMedusa } = await query.graph({
+        entity: "product",
+        fields: ["id", "title"],
+        filters: {
+          id: variante.product_id,
         },
       })
 
-    // =========================================
-    // 13. AGREGAR PRODUCTOS
-    // =========================================
+      const productoMedusa = productosMedusa?.[0]
 
-    await addToCartWorkflow(
-      req.scope
-    ).run({
-      input: {
-        cart_id:
-          cart.id,
+      productosConVariante.push({
+        ...producto,
+        product_title: productoMedusa?.title ?? null,
+        variant_id: variante.id,
+      })
+    }
 
-        items,
-      },
-    })
+    // =====================================================
+    // 6. SUMAR IMPUESTOS EXTRAÍDOS
+    // =====================================================
 
-    // =========================================
-    // 14. LINK
-    // =========================================
-
-    const recoveryLink =
-      `http://localhost:8000/cart/recover/${cart.id}`
-
-    console.log(
-      "=== COTIZACIÓN GENERADA ==="
+    const impuestoTotalUSD = productosConVariante.reduce(
+      (total, producto) =>
+        total + Number(producto.tax_usd || 0),
+      0
     )
 
-    console.log(
-      "CART:",
-      cart.id
-    )
+    // =====================================================
+    // 7. OBTENER TRM ACTUAL
+    // =====================================================
 
-    console.log(
-      "TRM:",
-      trm
-    )
+    // Si el servicio de TRM falla, el análisis continúa
+    // utilizando el valor predeterminado.
+    let trm = 4000
 
-    console.log(
-      "LINK:",
-      recoveryLink
-    )
+    try {
+      const trmResponse = await fetch(
+        "https://www.datos.gov.co/resource/ceyp-9c7c.json?$limit=1&$order=vigenciadesde%20DESC"
+      )
 
-    console.log(
-      "EXPIRA:",
-      expirationDate.toISOString()
-    )
+      if (trmResponse.ok) {
+        const trmData = await trmResponse.json()
+        const trmObtenida = Number(trmData?.[0]?.valor)
 
-    return res.json({
+        if (trmObtenida > 0) {
+          trm = trmObtenida
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "No se pudo consultar la TRM; se utilizará 4000."
+      )
+    }
+
+    // =====================================================
+    // 8. RESPONDER AL FRONTEND
+    // =====================================================
+
+    // IMPORTANTE:
+    // Esta ruta únicamente analiza y devuelve los datos.
+    // No busca al cliente, no crea carritos y no genera enlaces.
+
+    return res.status(200).json({
       success: true,
-
-      customer_email:
-        customer.email,
-
-      cart_id:
-        cart.id,
-
-      recovery_link:
-        recoveryLink,
-
+      customer_email: correoPdf,
+      products: productosConVariante,
+      impuesto: impuestoTotalUSD,
       trm,
-
-      expires_at:
-        expirationDate.toISOString(),
-
-      products:
-        productosConVariante,
+      vigencia_dias: vigenciaDias,
+      expires_at: expirationDate.toISOString(),
     })
   } catch (error: any) {
     console.error(
-      "=== ERROR ==="
+      "Error analizando cotización PDF:",
+      error
     )
-
-    console.error(error)
 
     return res.status(500).json({
       success: false,
       message:
-        error.message,
+        error?.message ||
+        "Ocurrió un error al analizar el PDF.",
     })
   }
 }
