@@ -242,3 +242,13 @@
 .nav-link:hover::before {
   display: block;
 }
+
+body {
+  overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+  body{
+    overflow-x: clip;
+  }
+}

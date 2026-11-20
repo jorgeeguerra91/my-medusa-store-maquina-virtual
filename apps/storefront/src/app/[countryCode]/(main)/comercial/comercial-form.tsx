@@ -2,6 +2,23 @@
 
 import { useState } from "react"
 
+const getBackendUrl = () => {
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost"
+  ) {
+    return "http://localhost:9000"
+  }
+
+  const url = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+
+  if (!url) {
+    throw new Error("Falta configurar la URL pública del backend")
+  }
+
+  return url.replace(/\/+$/, "")
+}
+
 type QuoteItem = {
   title: string
   variant_id: string
@@ -15,6 +32,7 @@ type QuoteItem = {
 type PdfProduct = {
   sku: string | null
   description: string
+  product_title?: string | null
   quantity: number
   unit_price_usd: number
   subtotal_usd: number
@@ -31,29 +49,36 @@ export default function ComercialForm() {
   const [loading, setLoading] = useState(false)
   const [link, setLink] = useState("")
   const [error, setError] = useState("")
-
   const [productName, setProductName] = useState("")
   const [products, setProducts] = useState<any[]>([])
   const [items, setItems] = useState<QuoteItem[]>([])
-
   const [trm, setTrm] = useState("4000")
   const [impuesto, setImpuesto] = useState("0")
   const [expiresAt, setExpiresAt] = useState("")
-
-  // PDF
+  const [vigenciaDias, setVigenciaDias] = useState("5")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [analizandoPdf, setAnalizandoPdf] = useState(false)
 
+  // Devuelve una fecha en formato AAAA-MM-DD,
+  // compatible con el input type="date".
+  function fechaDesdeDias(dias: string) {
+    const fecha = new Date()
+    fecha.setDate(fecha.getDate() + Number(dias))
+
+    const year = fecha.getFullYear()
+    const month = String(fecha.getMonth() + 1).padStart(2, "0")
+    const day = String(fecha.getDate()).padStart(2, "0")
+
+    return `${year}-${month}-${day}`
+  }
+
   const subtotalUSD = items.reduce(
-    (total, item) =>
-      total + item.unit_price * item.quantity,
+    (total, item) => total + item.unit_price * item.quantity,
     0
   )
 
-  const subtotalCOP =
-    subtotalUSD * Number(trm)
-
-const totalUSD = subtotalUSD + Number(impuesto)
+  const subtotalCOP = subtotalUSD * Number(trm || 0)
+  const totalUSD = subtotalUSD + Number(impuesto || 0)
 
   // =========================================================
   // ANALIZAR PDF
@@ -69,71 +94,61 @@ const totalUSD = subtotalUSD + Number(impuesto)
     setError("")
     setLink("")
 
-    try {
-      const formData = new FormData()
-      formData.append("file", pdfFile)
+try {
+  const formData = new FormData()
+  formData.append("file", pdfFile)
 
-      const res = await fetch(
-        "http://localhost:9000/store/quote-from-pdf",
-        {
-          method: "POST",
-          headers: {
-            "x-publishable-api-key":
-              process.env
-                .NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
-          },
-          body: formData,
-        }
-      )
+  const res = await fetch(
+    `${getBackendUrl()}/store/quote-from-pdf`,
+    {
+      method: "POST",
+      headers: {
+        "x-publishable-api-key":
+          process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
+      },
+      body: formData,
+    }
+  )
 
       const data = await res.json()
 
-      if (!res.ok) {
+      if (!res.ok || data.success === false) {
         setError(
-          data.message ||
-            "No fue posible analizar el PDF."
+          data.message || "No fue posible analizar el PDF."
         )
         return
       }
 
       // =====================================================
-      // DATOS GENERALES
+      // CORREO DEL PDF
       // =====================================================
 
-      if (data.customer_email) {
-        setEmail(data.customer_email)
-      } else if (data.email) {
-        setEmail(data.email)
-      }
+      const correoPdf = data.customer_email ?? data.email ?? null
 
-      if (data.trm) {
-        setTrm(String(data.trm))
-      }
-
-if (data.impuesto !== undefined) setImpuesto(String(data.impuesto))
-
-      // =====================================================
-      // FECHA DE VENCIMIENTO
-      // =====================================================
-
-      if (data.expires_at) {
-        const fecha = new Date(data.expires_at)
-
-        const year = fecha.getFullYear()
-        const month = String(
-          fecha.getMonth() + 1
-        ).padStart(2, "0")
-        const day = String(
-          fecha.getDate()
-        ).padStart(2, "0")
-
-        setExpiresAt(
-          `${year}-${month}-${day}`
+      if (correoPdf) {
+        setEmail(String(correoPdf).trim())
+      } else {
+        console.warn(
+          "El backend no detectó un correo en el PDF."
+        )
+        setError(
+          "PDF analizado, pero no se detectó un correo. Puede escribirlo manualmente."
         )
       }
 
       // =====================================================
-      // PRODUCTOS DEL PDF
+      // TRM Y VIGENCIA
+      // =====================================================
+
+      setTrm(String(data.trm ?? 4000))
+
+      const dias = String(data.vigencia_dias ?? 5)
+
+      setVigenciaDias(dias)
+      setExpiresAt(fechaDesdeDias(dias))
+
+      // =====================================================
+      // PRODUCTOS EXTRAÍDOS
       // =====================================================
 
       const productosPDF: PdfProduct[] =
@@ -143,35 +158,38 @@ if (data.impuesto !== undefined) setImpuesto(String(data.impuesto))
             ? data.productos
             : []
 
-     const impuestoTotalUSD = productosPDF.reduce(
-  (total, producto) => total + Number(producto.tax_usd || 0),
-  0
-)
+      const impuestoTotalUSD = productosPDF.reduce(
+        (total, producto) =>
+          total + Number(producto.tax_usd || 0),
+        0
+      )
 
-setImpuesto(String(impuestoTotalUSD))
+      setImpuesto(
+        String(data.impuesto ?? impuestoTotalUSD)
+      )
 
       const productosConvertidos: QuoteItem[] =
         productosPDF.map((producto) => ({
+          // Se prioriza el nombre o descripción del PDF.
           title:
             producto.description ||
+            producto.product_title ||
             "Producto sin descripción",
 
-          variant_id:
-            producto.variant_id || "",
+          variant_id: producto.variant_id || "",
 
-          quantity:
-            Number(producto.quantity) || 1,
+          quantity: Number(producto.quantity) || 1,
 
-          unit_price:
-            Number(producto.total_usd) || 0,
+          // Precio por unidad; la cantidad se multiplica
+          // posteriormente en el resumen.
+          unit_price: Number(producto.unit_price_usd) || 0,
 
-          sku:
-            producto.sku || null,
+          // Se conserva el SKU encontrado en el documento.
+          sku: producto.sku || null,
 
           fromPdf: true,
 
-          needsSelection:
-            !producto.variant_id,
+          needsSelection: !producto.variant_id,
         }))
 
       setItems(productosConvertidos)
@@ -183,7 +201,6 @@ setImpuesto(String(impuestoTotalUSD))
       }
     } catch (err) {
       console.error(err)
-
       setError(
         "No fue posible conectar con el servidor para analizar el PDF."
       )
@@ -201,72 +218,50 @@ setImpuesto(String(impuestoTotalUSD))
     setError("")
     setLink("")
 
-    if (!email) {
-      setError(
-        "Debe ingresar el correo del cliente."
-      )
-      setLoading(false)
-      return
-    }
+    try {
+      if (!email.trim()) {
+        setError("Debe ingresar el correo del cliente.")
+        return
+      }
 
-    if (!items.length) {
-      setError(
-        "Debe agregar al menos un producto."
-      )
-      setLoading(false)
-      return
-    }
+      if (!items.length) {
+        setError("Debe agregar al menos un producto.")
+        return
+      }
 
-    // Verificar productos que todavía no tienen variante
-    const productoPendiente =
-      items.find(
+      const productoPendiente = items.find(
         (item) => !item.variant_id
       )
 
-    if (productoPendiente) {
-      setError(
-        `Debe seleccionar un producto de Medusa para "${productoPendiente.title}".`
-      )
-      setLoading(false)
-      return
-    }
+      if (productoPendiente) {
+        setError(
+          `Debe seleccionar un producto de Medusa para "${productoPendiente.title}".`
+        )
+        return
+      }
 
-    if (!expiresAt) {
-      setError(
-        "Debe seleccionar una fecha límite."
-      )
-      setLoading(false)
-      return
-    }
+      if (!expiresAt) {
+        setError("Debe seleccionar una fecha límite.")
+        return
+      }
 
-    const trmNumerica = Number(trm)
-    const impuestoNumerico =
-      Number(impuesto)
+      const trmNumerica = Number(trm)
+      const impuestoNumerico = Number(impuesto)
 
-    if (!trmNumerica || trmNumerica <= 0) {
-      setError(
-        "La TRM debe ser mayor que 0."
-      )
-      setLoading(false)
-      return
-    }
+      if (!trmNumerica || trmNumerica <= 0) {
+        setError("La TRM debe ser mayor que 0.")
+        return
+      }
 
-    if (
-      Number.isNaN(impuestoNumerico) ||
-      impuestoNumerico < 0
-    ) {
-      setError(
-        "El impuesto no puede ser negativo."
-      )
-      setLoading(false)
-      return
-    }
+      if (
+        Number.isNaN(impuestoNumerico) ||
+        impuestoNumerico < 0
+      ) {
+        setError("El impuesto no puede ser negativo.")
+        return
+      }
 
-    try {
-      // Convertimos la fecha seleccionada
-      // al final del día.
-      const [year, month, day] =
-        expiresAt.split("-")
+      const [year, month, day] = expiresAt.split("-")
 
       const expirationDate = new Date(
         Number(year),
@@ -278,51 +273,35 @@ setImpuesto(String(impuestoTotalUSD))
         999
       )
 
-      if (
-        Number.isNaN(
-          expirationDate.getTime()
-        )
-      ) {
+      if (Number.isNaN(expirationDate.getTime())) {
         setError(
           "La fecha límite seleccionada no es válida."
         )
-        setLoading(false)
         return
       }
 
       const res = await fetch(
-        "http://localhost:9000/store/quote-cart-test",
+        `${getBackendUrl()}/store/quote-cart-test`,
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
             "x-publishable-api-key":
-              process.env
-                .NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
+              process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
           },
-
           body: JSON.stringify({
-            email,
+            email: email.trim(),
 
             items: items.map((item) => ({
               title: item.title,
-              variant_id:
-                item.variant_id,
-              quantity:
-                item.quantity,
-              unit_price:
-                item.unit_price,
+              variant_id: item.variant_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
             })),
 
             trm: trmNumerica,
-
-            impuesto:
-              impuestoNumerico,
-
-            expires_at:
-              expirationDate.toISOString(),
+            impuesto: impuestoNumerico,
+            expires_at: expirationDate.toISOString(),
           }),
         }
       )
@@ -330,10 +309,7 @@ setImpuesto(String(impuestoTotalUSD))
       const data = await res.json()
 
       if (!res.ok) {
-        const mensajes: Record<
-          string,
-          string
-        > = {
+        const mensajes: Record<string, string> = {
           "Customer not found":
             "No se encontró un cliente con ese correo.",
 
@@ -361,53 +337,49 @@ setImpuesto(String(impuestoTotalUSD))
             data.message ||
             "No fue posible generar el enlace. Verifique los datos e inténtelo nuevamente."
         )
-      } else {
-        setLink(
-          data.recovery_link
-        )
+
+        return
       }
+
+      setLink(data.recovery_link)
     } catch (err) {
       console.error(err)
-
-      setError(
-        "No fue posible conectar con el servidor."
-      )
+      setError("No fue posible conectar con el servidor.")
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   // =========================================================
   // BUSCAR PRODUCTO MANUALMENTE
   // =========================================================
 
-  async function buscarProducto(
-    valor: string
-  ) {
+  async function buscarProducto(valor: string) {
     setProductName(valor)
 
-    if (valor.length < 2) {
+    if (valor.trim().length < 2) {
       setProducts([])
       return
     }
 
     try {
       const res = await fetch(
-        `http://localhost:9000/store/product-search?q=${encodeURIComponent(
-          valor
-        )}`,
+        `${getBackendUrl()}/store/product-search?q=${encodeURIComponent(valor)}`,
         {
           headers: {
             "x-publishable-api-key":
-              process.env
-                .NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
+              process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY!,
           },
         }
       )
 
-      const data = await res.json()
+      if (!res.ok) {
+        setProducts([])
+        return
+      }
 
-      setProducts(data)
+      const data = await res.json()
+      setProducts(Array.isArray(data) ? data : [])
     } catch {
       setProducts([])
     }
@@ -428,13 +400,8 @@ setImpuesto(String(impuestoTotalUSD))
       return
     }
 
-    if (
-      !quantity ||
-      Number(quantity) < 1
-    ) {
-      alert(
-        "Ingrese una cantidad válida."
-      )
+    if (!quantity || Number(quantity) < 1) {
+      alert("Ingrese una cantidad válida.")
       return
     }
 
@@ -458,24 +425,29 @@ setImpuesto(String(impuestoTotalUSD))
   }
 
   // =========================================================
-  // SELECCIONAR PRODUCTO PARA PRODUCTO DEL PDF
+  // ASOCIAR UN PRODUCTO DEL PDF CON MEDUSA
   // =========================================================
 
   function seleccionarProductoParaItem(
     index: number,
     product: any
   ) {
+    const selectedVariantId =
+      product.variants?.[0]?.id || ""
+
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
           ? {
               ...item,
-              title: product.title,
-              variant_id:
-                product.variants?.[0]?.id ||
-                "",
-              needsSelection:
-                !product.variants?.[0]?.id,
+
+              // Conserva el nombre original del PDF.
+              title: item.fromPdf
+                ? item.title
+                : product.title,
+
+              variant_id: selectedVariantId,
+              needsSelection: !selectedVariantId,
             }
           : item
       )
@@ -486,10 +458,7 @@ setImpuesto(String(impuestoTotalUSD))
   // MODIFICAR CANTIDAD
   // =========================================================
 
-  function actualizarCantidad(
-    index: number,
-    valor: string
-  ) {
+  function actualizarCantidad(index: number, valor: string) {
     const cantidad = Number(valor)
 
     if (!cantidad || cantidad < 1) {
@@ -499,10 +468,7 @@ setImpuesto(String(impuestoTotalUSD))
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
-          ? {
-              ...item,
-              quantity: cantidad,
-            }
+          ? { ...item, quantity: cantidad }
           : item
       )
     )
@@ -512,23 +478,28 @@ setImpuesto(String(impuestoTotalUSD))
   // MODIFICAR PRECIO
   // =========================================================
 
-  function actualizarPrecio(
-    index: number,
-    valor: string
-  ) {
+  function actualizarPrecio(index: number, valor: string) {
+    if (valor.trim() === "") {
+      setItems((prev) =>
+        prev.map((item, itemIndex) =>
+          itemIndex === index
+            ? { ...item, unit_price: 0 }
+            : item
+        )
+      )
+      return
+    }
+
     const precio = Number(valor)
 
-    if (Number.isNaN(precio)) {
+    if (Number.isNaN(precio) || precio < 0) {
       return
     }
 
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index
-          ? {
-              ...item,
-              unit_price: precio,
-            }
+          ? { ...item, unit_price: precio }
           : item
       )
     )
@@ -546,17 +517,12 @@ setImpuesto(String(impuestoTotalUSD))
         </h2>
 
         <p className="text-sm text-gray-500 mt-1">
-          Puede cargar un PDF para
-          completar automáticamente la
-          información o llenar la
-          cotización manualmente.
+          Puede cargar un PDF para completar automáticamente
+          la información o llenar la cotización manualmente.
         </p>
       </div>
 
-      {/* =====================================================
-          PDF
-      ====================================================== */}
-
+      {/* PDF */}
       <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
         <h3 className="font-semibold">
           Analizar cotización PDF
@@ -567,8 +533,7 @@ setImpuesto(String(impuestoTotalUSD))
           accept="application/pdf"
           className="border rounded w-full p-2 bg-white"
           onChange={(e) => {
-            const archivo =
-              e.target.files?.[0] || null
+            const archivo = e.target.files?.[0] || null
 
             setPdfFile(archivo)
             setError("")
@@ -579,29 +544,20 @@ setImpuesto(String(impuestoTotalUSD))
         <button
           type="button"
           onClick={analizarPDF}
-          disabled={
-            analizandoPdf ||
-            !pdfFile
-          }
+          disabled={analizandoPdf || !pdfFile}
           className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
         >
-          {analizandoPdf
-            ? "Analizando PDF..."
-            : "Analizar PDF"}
+          {analizandoPdf ? "Analizando PDF..." : "Analizar PDF"}
         </button>
 
         <p className="text-xs text-gray-500">
-          El análisis solo llena el
-          formulario. Nada se crea hasta
-          presionar "Generar enlace".
+          El análisis solo llena el formulario. Nada se crea
+          hasta presionar "Generar enlace".
         </p>
       </div>
 
       <div className="space-y-4">
-        {/* ===================================================
-            TRM E IMPUESTO
-        ==================================================== */}
-
+        {/* TRM E IMPUESTO */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -614,9 +570,7 @@ setImpuesto(String(impuestoTotalUSD))
               step="0.01"
               className="border rounded w-full p-2"
               value={trm}
-              onChange={(e) =>
-                setTrm(e.target.value)
-              }
+              onChange={(e) => setTrm(e.target.value)}
             />
 
             <p className="text-xs text-gray-500 mt-1">
@@ -626,26 +580,49 @@ setImpuesto(String(impuestoTotalUSD))
 
           <div>
             <label className="block text-sm font-medium mb-1">
-              Impuesto
+              Impuesto (USD)
             </label>
 
             <input
               type="number"
               min="0"
-              max="100"
+              step="0.01"
               className="border rounded w-full p-2"
               value={impuesto}
-              onChange={(e) =>
-                setImpuesto(e.target.value)
-              }
+              onChange={(e) => setImpuesto(e.target.value)}
             />
           </div>
         </div>
 
-        {/* ===================================================
-            FECHA
-        ==================================================== */}
+        {/* VIGENCIA */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Vigencia de la cotización (días)
+          </label>
 
+          <input
+            type="number"
+            min="1"
+            max="365"
+            className="border rounded w-full p-2"
+            value={vigenciaDias}
+            onChange={(e) => {
+              const dias = e.target.value
+              setVigenciaDias(dias)
+
+              if (dias && Number(dias) >= 1) {
+                setExpiresAt(fechaDesdeDias(dias))
+              }
+            }}
+          />
+
+          <p className="text-xs text-gray-500 mt-1">
+            Se detecta desde el PDF cuando está disponible.
+            Por defecto son 5 días.
+          </p>
+        </div>
+
+        {/* FECHA LÍMITE */}
         <div>
           <label className="block text-sm font-medium mb-1">
             Fecha límite del enlace
@@ -655,28 +632,18 @@ setImpuesto(String(impuestoTotalUSD))
             type="date"
             className="border rounded w-full p-2"
             value={expiresAt}
-            onChange={(e) =>
-              setExpiresAt(e.target.value)
-            }
-            min={
-              new Date()
-                .toISOString()
-                .split("T")[0]
-            }
+            onChange={(e) => setExpiresAt(e.target.value)}
+            min={fechaDesdeDias("0")}
             required
           />
 
           <p className="text-xs text-gray-500 mt-1">
-            El enlace dejará de estar
-            disponible después de esta
-            fecha.
+            El enlace dejará de estar disponible después de
+            esta fecha.
           </p>
         </div>
 
-        {/* ===================================================
-            CORREO
-        ==================================================== */}
-
+        {/* CORREO */}
         <div>
           <label className="block text-sm font-medium mb-1">
             Correo del cliente
@@ -686,17 +653,17 @@ setImpuesto(String(impuestoTotalUSD))
             type="email"
             className="border rounded w-full p-2"
             value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="cliente@empresa.com"
           />
+
+          <p className="text-xs text-gray-500 mt-1">
+            Al analizar el PDF, el correo detectado se cargará
+            aquí. Puede editarlo antes de generar el enlace.
+          </p>
         </div>
 
-        {/* ===================================================
-            PRODUCTO MANUAL
-        ==================================================== */}
-
+        {/* PRODUCTO MANUAL */}
         <div>
           <label className="block text-sm font-medium mb-1">
             Agregar producto
@@ -707,11 +674,7 @@ setImpuesto(String(impuestoTotalUSD))
             className="border rounded w-full p-2"
             placeholder="Buscar producto..."
             value={productName}
-            onChange={(e) =>
-              buscarProducto(
-                e.target.value
-              )
-            }
+            onChange={(e) => buscarProducto(e.target.value)}
           />
 
           {products.length > 0 && (
@@ -723,14 +686,9 @@ setImpuesto(String(impuestoTotalUSD))
                   className="block w-full text-left px-3 py-2 hover:bg-gray-100"
                   onClick={() => {
                     setVariantId(
-                      product.variants?.[0]
-                        ?.id || ""
+                      product.variants?.[0]?.id || ""
                     )
-
-                    setProductName(
-                      product.title
-                    )
-
+                    setProductName(product.title)
                     setProducts([])
                   }}
                 >
@@ -741,10 +699,7 @@ setImpuesto(String(impuestoTotalUSD))
           )}
         </div>
 
-        {/* ===================================================
-            CANTIDAD Y PRECIO MANUAL
-        ==================================================== */}
-
+        {/* CANTIDAD Y PRECIO MANUAL */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -756,11 +711,7 @@ setImpuesto(String(impuestoTotalUSD))
               min="1"
               className="border rounded w-full p-2"
               value={quantity}
-              onChange={(e) =>
-                setQuantity(
-                  e.target.value
-                )
-              }
+              onChange={(e) => setQuantity(e.target.value)}
             />
           </div>
 
@@ -775,17 +726,12 @@ setImpuesto(String(impuestoTotalUSD))
               step="0.01"
               className="border rounded w-full p-2"
               value={price}
-              onChange={(e) =>
-                setPrice(e.target.value)
-              }
+              onChange={(e) => setPrice(e.target.value)}
             />
           </div>
         </div>
 
-        {/* ===================================================
-            AGREGAR MANUALMENTE
-        ==================================================== */}
-
+        {/* AGREGAR PRODUCTO MANUAL */}
         <div>
           <button
             type="button"
@@ -796,307 +742,206 @@ setImpuesto(String(impuestoTotalUSD))
           </button>
         </div>
 
-        {/* ===================================================
-            PRODUCTOS
-        ==================================================== */}
-
+        {/* PRODUCTOS DE LA COTIZACIÓN */}
         {items.length > 0 && (
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="font-semibold">
               Productos de la cotización
             </h3>
 
-            {items.map(
-              (item, index) => (
-                <div
-                  key={index}
-                  className="border rounded-lg p-4 space-y-3"
-                >
-                  {/* PRODUCTO */}
+            {items.map((item, index) => (
+              <div
+                key={index}
+                className="border rounded-lg p-4 space-y-3"
+              >
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="font-medium">
+                      {item.title}
+                    </div>
 
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {item.title}
+                    {item.sku && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        SKU: {item.sku}
                       </div>
+                    )}
 
-                      {item.sku && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          SKU: {item.sku}
-                        </div>
-                      )}
+                    {item.needsSelection && (
+                      <div className="text-xs text-orange-600 mt-1 font-medium">
+                        ⚠ Seleccione el producto de Medusa antes
+                        de generar el enlace.
+                      </div>
+                    )}
+                  </div>
 
-                      {item.needsSelection && (
-                        <div className="text-xs text-orange-600 mt-1 font-medium">
-                          ⚠ Seleccione el
-                          producto de
-                          Medusa antes de
-                          generar el enlace.
-                        </div>
-                      )}
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setItems((prev) =>
+                        prev.filter((_, i) => i !== index)
+                      )
+                    }
+                    className="text-red-600 hover:text-red-800 font-semibold"
+                  >
+                    Eliminar
+                  </button>
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setItems(
-                          (prev) =>
-                            prev.filter(
-                              (
-                                _,
-                                i
-                              ) =>
-                                i !== index
-                            )
-                        )
+                {/* ASOCIAR PRODUCTO DEL PDF */}
+                {item.needsSelection && (
+                  <div>
+                    <input
+                      type="text"
+                      className="border rounded w-full p-2"
+                      placeholder="Buscar producto para asociarlo..."
+                      onChange={(e) =>
+                        buscarProducto(e.target.value)
                       }
-                      className="text-red-600 hover:text-red-800 font-semibold"
-                    >
-                      Eliminar
-                    </button>
+                    />
+
+                    {products.length > 0 && (
+                      <div className="border rounded mt-1 bg-white shadow">
+                        {products.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            className="block w-full text-left px-3 py-2 hover:bg-gray-100"
+                            onClick={() => {
+                              seleccionarProductoParaItem(
+                                index,
+                                product
+                              )
+                              setProducts([])
+                              setProductName("")
+                            }}
+                          >
+                            {product.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* EDITAR CANTIDAD Y PRECIO */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Cantidad
+                    </label>
+
+                    <input
+                      type="number"
+                      min="1"
+                      className="border rounded w-full p-2"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        actualizarCantidad(index, e.target.value)
+                      }
+                    />
                   </div>
 
-                  {/* BUSCAR PRODUCTO PARA UNO
-                      QUE VINO DEL PDF */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Precio negociado (USD)
+                    </label>
 
-                  {item.needsSelection && (
-                    <div>
-                      <input
-                        type="text"
-                        className="border rounded w-full p-2"
-                        placeholder="Buscar producto para asociarlo..."
-                        onChange={(e) =>
-                          buscarProducto(
-                            e.target.value
-                          )
-                        }
-                      />
-
-                      {products.length >
-                        0 && (
-                        <div className="border rounded mt-1 bg-white shadow">
-                          {products.map(
-                            (
-                              product
-                            ) => (
-                              <button
-                                key={
-                                  product.id
-                                }
-                                type="button"
-                                className="block w-full text-left px-3 py-2 hover:bg-gray-100"
-                                onClick={() => {
-                                  seleccionarProductoParaItem(
-                                    index,
-                                    product
-                                  )
-
-                                  setProducts(
-                                    []
-                                  )
-                                  setProductName(
-                                    ""
-                                  )
-                                }}
-                              >
-                                {
-                                  product.title
-                                }
-                              </button>
-                            )
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* CANTIDAD */}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Cantidad
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        className="border rounded w-full p-2"
-                        value={
-                          item.quantity
-                        }
-                        onChange={(
-                          e
-                        ) =>
-                          actualizarCantidad(
-                            index,
-                            e.target
-                              .value
-                          )
-                        }
-                      />
-                    </div>
-
-                    {/* PRECIO */}
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Precio negociado (USD)
-                      </label>
-
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="border rounded w-full p-2"
-                        value={
-                          item.unit_price
-                        }
-                        onChange={(
-                          e
-                        ) =>
-                          actualizarPrecio(
-                            index,
-                            e.target
-                              .value
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-sm text-gray-500">
-                    Total producto: $
-                    {(
-                      item.unit_price *
-                      item.quantity
-                    ).toFixed(2)}{" "}
-                    USD
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="border rounded w-full p-2"
+                      value={item.unit_price}
+                      onChange={(e) =>
+                        actualizarPrecio(index, e.target.value)
+                      }
+                    />
                   </div>
                 </div>
-              )
-            )}
+
+                <div className="text-sm text-gray-500">
+                  Total producto: $
+                  {(item.unit_price * item.quantity).toFixed(2)} USD
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* ===================================================
-            RESUMEN
-        ==================================================== */}
-
+        {/* RESUMEN */}
         {items.length > 0 && (
           <div className="border rounded-lg p-4 bg-gray-50 space-y-2">
             <div className="flex justify-between">
-              <span>
-                Subtotal USD:
-              </span>
+              <span>Subtotal USD:</span>
+              <span>${subtotalUSD.toFixed(2)} USD</span>
+            </div>
 
+            <div className="flex justify-between">
+              <span>TRM:</span>
+              <span>
+                ${Number(trm || 0).toLocaleString("es-CO")}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Impuesto:</span>
               <span>
                 $
-                {subtotalUSD.toFixed(
-                  2
-                )}{" "}
+                {Number(impuesto || 0).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
                 USD
               </span>
             </div>
 
             <div className="flex justify-between">
-              <span>TRM:</span>
-
+              <span>Subtotal COP:</span>
               <span>
                 $
-                {Number(
-                  trm
-                ).toLocaleString(
-                  "es-CO"
-                )}
+                {subtotalCOP.toLocaleString("es-CO", {
+                  maximumFractionDigits: 2,
+                })}
               </span>
-            </div>
-
-            <div className="flex justify-between">
-              
-              <span>
-                Impuesto:
-              </span>
-              
-            
-
-               <span>
-                $
-{Number(impuesto).toLocaleString(
-  "en-US",
-  {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }
-)}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span>
-                Subtotal COP:
-              </span>
-
-  <span>
-                $
-                {subtotalCOP.toLocaleString(
-                  "es-CO"
-                )}
-              </span>
-             
             </div>
 
             <div className="flex justify-between font-bold text-lg border-t pt-2">
               <span>Total:</span>
-
               <span>
                 $
-{(
-  subtotalUSD + Number(impuesto)
-).toLocaleString("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})}
+                {totalUSD.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                USD
               </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* =====================================================
-          GENERAR
-      ====================================================== */}
-
+      {/* GENERAR ENLACE */}
       <button
         type="button"
         onClick={generar}
         disabled={loading}
         className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded"
       >
-        {loading
-          ? "Generando..."
-          : "Generar enlace"}
+        {loading ? "Generando..." : "Generar enlace"}
       </button>
 
-      {/* =====================================================
-          ERROR
-      ====================================================== */}
-
+      {/* ERROR */}
       {error && (
         <div className="rounded bg-red-100 text-red-700 p-3">
           {error}
         </div>
       )}
 
-      {/* =====================================================
-          ENLACE
-      ====================================================== */}
-
+      {/* ENLACE */}
       {link && (
         <div className="rounded bg-green-100 p-4 space-y-3">
           <p className="font-semibold text-green-700">
-            ✔ Enlace generado
-            correctamente
+            ✔ Enlace generado correctamente
           </p>
 
           <input
@@ -1107,11 +952,7 @@ setImpuesto(String(impuestoTotalUSD))
 
           <button
             type="button"
-            onClick={() =>
-              navigator.clipboard.writeText(
-                link
-              )
-            }
+            onClick={() => navigator.clipboard.writeText(link)}
             className="bg-green-600 text-white px-4 py-2 rounded"
           >
             Copiar enlace

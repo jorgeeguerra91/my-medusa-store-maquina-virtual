@@ -49,6 +49,7 @@ const ProductInfoTab = ({ product }: ProductTabsProps) => {
     <div className="text-small-regular py-8">
       <div className="grid grid-cols-2 gap-x-8">
         <div className="flex flex-col gap-y-4">
+          
           <div>
             <span className="font-semibold">Referencia</span>
             <p>{product.material ? product.material : "-"}</p>
@@ -71,6 +72,10 @@ const ProductInfoTab = ({ product }: ProductTabsProps) => {
             <span className="font-semibold">Informacion adicional</span>
             <p>{metadata.informacion_adicional || "-"}</p>
           </div>
+              <div>
+  <span className="font-semibold">SKU</span>
+  <p>{product.variants?.[0]?.sku || "-"}</p>
+</div>
         </div>
       </div>
     </div>

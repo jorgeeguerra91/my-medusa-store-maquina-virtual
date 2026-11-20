@@ -1,6 +1,36 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
+function getRequestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    .trim()
+
+  const host = request.headers.get("host")?.trim()
+  const hosts = [forwardedHost, host].filter(
+    (value): value is string => Boolean(value)
+  )
+
+  const cloudflareHost = hosts.find((value) =>
+    /^[a-z0-9-]+\.trycloudflare\.com$/i.test(value)
+  )
+
+  if (cloudflareHost) {
+    return `https://${cloudflareHost}`
+  }
+
+  const localHost = hosts.find((value) =>
+    /^(localhost|127\.0\.0\.1):8000$/i.test(value)
+  )
+
+  if (localHost) {
+    return `http://${localHost}`
+  }
+
+  return request.nextUrl.origin
+}
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "dk"
@@ -131,7 +161,7 @@ export async function middleware(request: NextRequest) {
   const redirectPath =
     request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
   const queryString = request.nextUrl.search || ""
-  const redirectUrl = `${request.nextUrl.origin}/${country}${redirectPath}${queryString}`
+  const redirectUrl = `${getRequestOrigin(request)}/${country}${redirectPath}${queryString}`
 
   return NextResponse.redirect(redirectUrl, 307)
 }

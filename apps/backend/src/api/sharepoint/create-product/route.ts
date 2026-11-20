@@ -1,18 +1,19 @@
-
 import type {
   MedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
 
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { timingSafeEqual } from "crypto"
 
 import {
   createProductsWorkflow,
+  updateProductsWorkflow,
+  updateProductVariantsWorkflow,
   batchLinkProductsToCategoryWorkflow,
   createInventoryLevelsWorkflow,
+  updateInventoryLevelsWorkflow,
 } from "@medusajs/medusa/core-flows"
-
-console.log("ROUTE CREATE-PRODUCT CARGADA")
 
 type CreateProductBody = {
   title: string
@@ -27,31 +28,58 @@ type CreateProductBody = {
   categoria?: string
   vigencia?: number | string
   informacion_adicional?: string
-
-  // Columna de inventario proveniente de SharePoint
   inventario?: number | string | null
+
+  // NUEVOS: para editar un producto ya creado
+  id_medusa?: string
+  sharepoint_item_id?: string | number
 }
 
-export async function GET(
-  req: MedusaRequest,
-  res: MedusaResponse
-) {
-  console.log("GET RECIBIDO")
+// Comparación segura de textos (evita ataques por tiempo de respuesta)
+function iguales(a: string, b: string) {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB)
+}
 
-  return res.json({
-    success: true,
-    message: "Endpoint funcionando",
-  })
+// Valida la autenticación básica (usuario y contraseña) del flujo de Power Automate
+function autorizado(req: MedusaRequest) {
+  const usuario = process.env.SHAREPOINT_PRODUCTS_USER
+  const clave = process.env.SHAREPOINT_PRODUCTS_PASSWORD
+
+  // Si no están configuradas las variables, se rechaza todo por seguridad
+  if (!usuario || !clave) return false
+
+  const header = req.headers["authorization"] ?? ""
+  if (!header.startsWith("Basic ")) return false
+
+  const decodificado = Buffer.from(header.slice(6), "base64").toString("utf-8")
+  const separador = decodificado.indexOf(":")
+  if (separador < 0) return false
+
+  return (
+    iguales(decodificado.slice(0, separador), usuario) &&
+    iguales(decodificado.slice(separador + 1), clave)
+  )
+}
+
+export async function GET(req: MedusaRequest, res: MedusaResponse) {
+  return res.json({ success: true, message: "Endpoint funcionando" })
 }
 
 export async function POST(
   req: MedusaRequest<CreateProductBody>,
   res: MedusaResponse
 ) {
-  try {
-    console.log("POST RECIBIDO")
-    console.log("BODY:", req.body)
+  if (!autorizado(req)) {
+    return res.status(401).json({
+      success: false,
+      estado_sincronizacion: "Error",
+      error: "No autorizado.",
+    })
+  }
 
+  try {
     const {
       title,
       sku,
@@ -66,16 +94,18 @@ export async function POST(
       informacion_adicional,
       price,
       inventario,
+      id_medusa,
     } = req.body
 
-    // 1. Determinar si requiere envío
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+    // 1. Requiere envío
     const requiresShippingBool =
       requires_shipping === true ||
       requires_shipping === "True" ||
       requires_shipping === "true"
 
-    // 2. Interpretar el inventario.
-    // Si viene vacío, el producto no controlará stock.
+    // 2. Inventario (vacío = sin control de stock)
     const inventarioVacio =
       inventario === undefined ||
       inventario === null ||
@@ -86,12 +116,10 @@ export async function POST(
     if (!inventarioVacio) {
       const cantidad = Number(inventario)
 
-      if (
-        !Number.isInteger(cantidad) ||
-        cantidad < 0
-      ) {
+      if (!Number.isInteger(cantidad) || cantidad < 0) {
         return res.status(400).json({
           success: false,
+          estado_sincronizacion: "Error",
           error:
             "El inventario debe ser un número entero mayor o igual a cero, o quedar vacío.",
         })
@@ -100,19 +128,9 @@ export async function POST(
       cantidadInventario = cantidad
     }
 
-    const manageInventory =
-      cantidadInventario !== null
+    const manageInventory = cantidadInventario !== null
 
-    console.log("INVENTARIO RECIBIDO:", inventario)
-    console.log("MANAGE INVENTORY:", manageInventory)
-    console.log("CANTIDAD:", cantidadInventario)
-
-    // 3. Obtener Query
-    const query = req.scope.resolve(
-      ContainerRegistrationKeys.QUERY
-    )
-
-    // 4. Obtener el perfil de envío existente
+    // 3. Perfil de envío
     const {
       data: [shippingProfile],
     } = await query.graph({
@@ -120,62 +138,122 @@ export async function POST(
       fields: ["id"],
     })
 
-    console.log("SHIPPING PROFILE:", shippingProfile)
-
-    console.log(
-      "requires_shipping:",
-      requires_shipping,
-      typeof requires_shipping
-    )
-
-    console.log(
-      "requiresShippingBool:",
-      requiresShippingBool
-    )
-
-    // 5. Si hay inventario, obtener una ubicación de stock
+    // 4. Ubicación de stock (solo si hay inventario)
     let stockLocationId: string | undefined
 
     if (manageInventory) {
-      const { data: stockLocations } =
-        await query.graph({
-          entity: "stock_location",
-          fields: ["id", "name"],
-        })
+      const { data: stockLocations } = await query.graph({
+        entity: "stock_location",
+        fields: ["id", "name"],
+      })
 
       if (!stockLocations.length) {
         return res.status(400).json({
           success: false,
-          error:
-            "No hay ninguna ubicación de stock configurada en Medusa.",
+          estado_sincronizacion: "Error",
+          error: "No hay ninguna ubicación de stock configurada en Medusa.",
         })
       }
 
-      // Se utiliza la primera ubicación disponible.
       stockLocationId = stockLocations[0].id
-
-      console.log(
-        "STOCK LOCATION:",
-        stockLocations[0]
-      )
     }
 
-    // 6. Mapeo de categorías
-    const categoryMap: Record<string, string> = {
-      Software: "pcat_01KRP9T3DFRR12KXBGSDYWPXRG",
-      Hardware: "pcat_01KRP9V9FFHGRG9RPPD7NFQH42",
-      "Servicios TI": "pcat_01KRP9WM7ESPX2VSE016KSFQPW",
-      "Microsoft Solutions": "pcat_01KRP9YD4A06TFZF4C0H5B292Y",
+    // 5. Categoría: se busca por nombre en Medusa (ya no hay mapa fijo)
+    let categoryId: string | undefined
+    let advertencia: string | undefined
+
+    if (categoria && categoria.trim()) {
+      const { data: categoriesFound } = await query.graph({
+        entity: "product_category",
+        fields: ["id", "name"],
+        filters: { name: categoria.trim() },
+      })
+
+      categoryId = categoriesFound[0]?.id
+
+      if (!categoryId) {
+        advertencia = `No existe en Medusa una categoría llamada "${categoria}".`
+      }
     }
 
-    console.log(
-      "CATEGORY ID:",
-      categoryMap[categoria ?? ""]
-    )
+    // 6. ¿El producto ya existe? Primero por id_medusa, luego por SKU
+    let productId = id_medusa?.trim() || ""
+    let variantId = ""
 
-    // 7. Crear producto y variante
-    const { result } =
-      await createProductsWorkflow(req.scope).run({
+    if (productId) {
+      const { data } = await query.graph({
+        entity: "product",
+        fields: ["id", "variants.id"],
+        filters: { id: productId },
+      })
+
+      if (data.length) {
+        variantId = (data[0] as any).variants?.[0]?.id ?? ""
+      } else {
+        productId = ""
+      }
+    }
+
+    if (!productId && sku) {
+      const { data } = await query.graph({
+        entity: "variant",
+        fields: ["id", "product_id", "sku"],
+        filters: { sku },
+      })
+
+      if (data.length) {
+        productId = (data[0] as any).product_id
+        variantId = data[0].id
+      }
+    }
+
+    const metadata = { informacion_adicional, vigencia, categoria }
+    const isUpdate = !!productId
+
+    // ============ EDITAR ============
+    if (isUpdate) {
+      await updateProductsWorkflow(req.scope).run({
+        input: {
+          products: [
+            {
+              id: productId,
+              title,
+              // El handle solo se define al crear: no se modifica al editar
+              description,
+              status: "published",
+              material: referencia,
+              origin_country: fabricante,
+              metadata,
+              ...(image_url ? { images: [{ url: image_url }] } : {}),
+              ...(requiresShippingBool
+                ? { shipping_profile_id: shippingProfile.id }
+                : {}),
+            },
+          ],
+        } as any,
+      })
+
+      if (variantId) {
+        await updateProductVariantsWorkflow(req.scope).run({
+          input: {
+            product_variants: [
+              {
+                id: variantId,
+                sku,
+                // El inventario no se toca al editar
+                prices: [
+                  { amount: Number(price ?? 0), currency_code: "cop" },
+                ],
+              },
+            ],
+          } as any,
+        })
+      }
+    }
+
+    // ============ CREAR ============
+    if (!isUpdate) {
+      const { result } = await createProductsWorkflow(req.scope).run({
         input: {
           products: [
             {
@@ -185,51 +263,20 @@ export async function POST(
               status: "published",
               material: referencia,
               origin_country: fabricante,
-
-              metadata: {
-                informacion_adicional,
-                vigencia,
-                categoria,
-              },
-
-              shipping_profile_id:
-                requiresShippingBool
-                  ? shippingProfile.id
-                  : undefined,
-
-              images: image_url
-                ? [
-                    {
-                      url: image_url,
-                    },
-                  ]
-                : [],
-
-              options: [
-                {
-                  title: "Default",
-                  values: ["Default"],
-                },
-              ],
-
+              metadata,
+              shipping_profile_id: requiresShippingBool
+                ? shippingProfile.id
+                : undefined,
+              images: image_url ? [{ url: image_url }] : [],
+              options: [{ title: "Default", values: ["Default"] }],
               variants: [
                 {
                   title: "Default",
                   sku,
-
-                  // Vacío = disponibilidad ilimitada.
-                  // Con cantidad = control de inventario.
                   manage_inventory: manageInventory,
-
-                  options: {
-                    Default: "Default",
-                  },
-
+                  options: { Default: "Default" },
                   prices: [
-                    {
-                      amount: Number(price ?? 0),
-                      currency_code: "cop",
-                    },
+                    { amount: Number(price ?? 0), currency_code: "cop" },
                   ],
                 },
               ],
@@ -238,124 +285,120 @@ export async function POST(
         },
       })
 
-    console.log("PRODUCTO CREADO:", result)
+      productId = result[0].id
+      variantId = result[0].variants?.[0]?.id ?? ""
+    }
 
-    const productId = result[0].id
-
-    console.log("PRODUCT ID:", productId)
-
-    // 8. Crear nivel de inventario si se informó una cantidad
+    // 7. Inventario: solo al crear el producto. Al editar no se modifica,
+    // porque Medusa lleva el stock real (las ventas lo descuentan).
     if (
+      !isUpdate &&
       manageInventory &&
       stockLocationId &&
       cantidadInventario !== null
     ) {
-      const variantId = result[0].variants?.[0]?.id
-
       if (!variantId) {
-        throw new Error(
-          "El producto se creó, pero no se encontró su variante."
-        )
+        throw new Error("No se encontró la variante del producto.")
       }
 
-      // La variante ya tiene un inventory item porque
-      // manage_inventory está habilitado.
-      const { data: variantsFound } =
-        await query.graph({
-          entity: "variant",
-          fields: [
-            "id",
-            "inventory_items.inventory.id",
-          ],
-          filters: {
-            id: variantId,
-          },
-        })
+      const { data: variantsFound } = await query.graph({
+        entity: "variant",
+        fields: ["id", "inventory_items.inventory.id"],
+        filters: { id: variantId },
+      })
 
-      const inventoryItemId =
-        variantsFound[0]?.inventory_items?.[0]
-          ?.inventory?.id
+      const inventoryItemId = (variantsFound[0] as any)?.inventory_items?.[0]
+        ?.inventory?.id
 
       if (!inventoryItemId) {
-        throw new Error(
-          "No se encontró el inventory item de la variante."
-        )
+        throw new Error("No se encontró el inventory item de la variante.")
       }
 
-      // Registrar la cantidad en la ubicación de stock
-      await createInventoryLevelsWorkflow(
-        req.scope
-      ).run({
-        input: {
-          inventory_levels: [
-            {
-              inventory_item_id: inventoryItemId,
-              location_id: stockLocationId,
-              stocked_quantity: cantidadInventario,
-            },
-          ],
+      const { data: levels } = await query.graph({
+        entity: "inventory_level",
+        fields: ["id"],
+        filters: {
+          inventory_item_id: inventoryItemId,
+          location_id: stockLocationId,
         },
       })
 
-      console.log("INVENTARIO REGISTRADO:", {
-        inventoryItemId,
-        stockLocationId,
-        cantidadInventario,
-      })
-    }
-
-    // 9. Asociar categoría
-    if (categoria && categoryMap[categoria]) {
-      console.log("ENTRANDO AL LINK")
-
-      const { data: categoriesFound } =
-        await query.graph({
-          entity: "product_category",
-          fields: ["id", "name"],
-          filters: {
-            id: [categoryMap[categoria]],
+      if (levels.length) {
+        await updateInventoryLevelsWorkflow(req.scope).run({
+          input: {
+            updates: [
+              {
+                inventory_item_id: inventoryItemId,
+                location_id: stockLocationId,
+                stocked_quantity: cantidadInventario,
+              },
+            ],
+          } as any,
+        })
+      } else {
+        await createInventoryLevelsWorkflow(req.scope).run({
+          input: {
+            inventory_levels: [
+              {
+                inventory_item_id: inventoryItemId,
+                location_id: stockLocationId,
+                stocked_quantity: cantidadInventario,
+              },
+            ],
           },
         })
-
-      console.log(
-        "CATEGORIAS ENCONTRADAS:",
-        categoriesFound
-      )
-
-      await batchLinkProductsToCategoryWorkflow(
-        req.scope
-      ).run({
-        input: {
-          id: categoryMap[categoria],
-          add: [productId],
-        },
-      })
-
-      console.log("LINK COMPLETADO")
+      }
     }
 
-    // 10. Respuesta
+    // 8. Categoría: quitar las anteriores y asociar la nueva
+    if (categoryId) {
+      const { data: current } = await query.graph({
+        entity: "product",
+        fields: ["id", "categories.id"],
+        filters: { id: productId },
+      })
+
+      const currentIds: string[] = (
+        (current[0] as any)?.categories ?? []
+      ).map((c: any) => c.id)
+
+      for (const oldId of currentIds) {
+        if (oldId !== categoryId) {
+          await batchLinkProductsToCategoryWorkflow(req.scope).run({
+            input: { id: oldId, remove: [productId] },
+          })
+        }
+      }
+
+      if (!currentIds.includes(categoryId)) {
+        await batchLinkProductsToCategoryWorkflow(req.scope).run({
+          input: { id: categoryId, add: [productId] },
+        })
+      }
+    }
+
+    // 9. Respuesta
     return res.json({
       success: true,
-      product: result[0],
-      inventory: {
-        managed: manageInventory,
-        quantity: cantidadInventario,
-        stock_location_id: stockLocationId ?? null,
-      },
+      accion: isUpdate ? "actualizado" : "creado",
+      id_medusa: productId,
+      estado_sincronizacion: "Sincronizada",
+      ...(advertencia ? { advertencia } : {}),
+      inventory: isUpdate
+        ? { sin_cambios: true }
+        : {
+            managed: manageInventory,
+            quantity: cantidadInventario,
+            stock_location_id: stockLocationId ?? null,
+          },
     })
   } catch (error: any) {
-    console.log(
-      "========== ERROR COMPLETO =========="
-    )
-
-    console.dir(error, {
-      depth: null,
-    })
+    console.error("[sharepoint/create-product]", error?.message ?? error)
 
     return res.status(500).json({
       success: false,
-      error: error.message,
+      estado_sincronizacion: "Error",
+      error: error?.message ?? "No se pudo sincronizar el producto.",
     })
   }
 }

@@ -1,40 +1,11 @@
-import { login, setGoogleAuthToken } from "@lib/data/customer"
-import { sdk } from "@lib/config"
-import { LOGIN_VIEW } from "@modules/account/templates/login-template"
+import { login } from "@lib/data/customer"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import Input from "@modules/common/components/input"
 import { useActionState } from "react"
 
-type Props = {
-  setCurrentView: (view: LOGIN_VIEW) => void
-}
-
-const Login = ({ setCurrentView }: Props) => {
+const Login = () => {
   const [message, formAction] = useActionState(login, null)
-
-  const loginWithGoogle = async () => {
-    try {
-      const result = await sdk.auth.login("customer", "google", {})
-
-      if (
-        typeof result === "object" &&
-        result !== null &&
-        "location" in result &&
-        typeof result.location === "string"
-      ) {
-        window.location.href = result.location
-        return
-      }
-
-      if (typeof result === "string") {
-        await setGoogleAuthToken(result)
-        window.location.href = "/co/account"
-      }
-    } catch (error) {
-      console.error("Google login error:", error)
-    }
-  }
 
   return (
     <div
@@ -76,24 +47,8 @@ const Login = ({ setCurrentView }: Props) => {
         </SubmitButton>
       </form>
 
-      <button
-        type="button"
-        onClick={loginWithGoogle}
-        className="w-full mt-4 border border-ui-border-base rounded-md py-3"
-      >
-        Continuar con Google
-      </button>
-
       <span className="text-center text-ui-fg-base text-small-regular mt-6">
-        No estas registrado?{" "}
-        <button
-          onClick={() => setCurrentView(LOGIN_VIEW.REGISTER)}
-          className="underline"
-          data-testid="register-button"
-        >
-          Registrate
-        </button>
-        .
+        Acceso solo para usuarios autorizados de COEM.
       </span>
     </div>
   )

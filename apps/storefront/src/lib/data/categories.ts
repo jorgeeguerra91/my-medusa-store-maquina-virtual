@@ -5,6 +5,7 @@ import { getCacheOptions } from "./cookies"
 export const listCategories = async (query?: Record<string, unknown>) => {
   const next = {
     ...(await getCacheOptions("categories")),
+    revalidate: 10,
   }
 
   const limit = query?.limit || 100

@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import useToggleState from "@lib/hooks/use-toggle-state"
 import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -10,44 +11,63 @@ type NavCategoryProps = {
 
 export default function NavCategory({ categories }: NavCategoryProps) {
   const toggleState = useToggleState()
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleEnter = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    toggleState.open()
+  }
+
+  const handleLeave = () => {
+    closeTimer.current = setTimeout(() => toggleState.close(), 120)
+  }
 
   return (
     <div
-      onMouseEnter={toggleState.open}
-      onMouseLeave={() => {
-        setTimeout(() => toggleState.close(), 120)
-      }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       className="relative"
     >
       <LocalizedClientLink
-  href="/store"
-  className={`
-    hover:opacity-70
-    nav-link
-    text-coemColors-azulCoem
-    cursor-pointer
-    relative
-    pr-4
+        href="/store"
+        className={`
+          hover:opacity-70
+          nav-link
+          !text-sm
+          text-coemColors-azulCoem
+          cursor-pointer
+          relative
+          inline-flex
+          items-center
+          gap-1.5
 
-    after:content-['▼']
-    after:absolute
-    after:right-0
-    after:top-[2px]
-    after:text-[12px]
-    after:font-bold
+          before:absolute
+          before:left-0
+          before:-top-2
+          before:w-full
+          before:h-[2px]
+          before:bg-coemColors-magentaCoem
 
-    before:absolute
-    before:left-0
-    before:-top-2
-    before:w-full
-    before:h-[2px]
-    before:bg-coemColors-magentaCoem
-
-    ${toggleState.state ? "before:block" : "before:hidden"}
-  `}
->
-  Tienda
-</LocalizedClientLink>
+          ${toggleState.state ? "before:block" : "before:hidden"}
+        `}
+      >
+        Tienda
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform duration-200 ${
+            toggleState.state ? "rotate-180" : ""
+          }`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </LocalizedClientLink>
 
       {toggleState.state && (
         <div
@@ -55,7 +75,7 @@ export default function NavCategory({ categories }: NavCategoryProps) {
             absolute
             top-full
             left-0
-            h-[30px]
+            h-[20px]
             w-[220px]
           "
         />
@@ -65,7 +85,7 @@ export default function NavCategory({ categories }: NavCategoryProps) {
         <div
           className="
             absolute
-            top-[calc(100%+30px)]
+            top-[calc(100%+20px)]
             left-0
             bg-coemColors-azulCoem
             text-white

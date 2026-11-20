@@ -22,10 +22,13 @@ type ProductActionsProps = {
 const optionsAsKeymap = (
   variantOptions: HttpTypes.StoreProductVariant["options"]
 ) => {
-  return variantOptions?.reduce((acc: Record<string, string>, varopt) => {
-    if (varopt.option_id) acc[varopt.option_id] = varopt.value
-    return acc
-  }, {})
+  return variantOptions?.reduce(
+    (acc: Record<string, string>, varopt) => {
+      if (varopt.option_id) acc[varopt.option_id] = varopt.value
+      return acc
+    },
+    {}
+  )
 }
 
 export default function ProductActions({
@@ -36,14 +39,25 @@ export default function ProductActions({
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const [options, setOptions] = useState<Record<string, string | undefined>>({})
+  const [options, setOptions] = useState<
+    Record<string, string | undefined>
+  >({})
   const [isAdding, setIsAdding] = useState(false)
+
+  // Nuevo: controlar el error de inventario y otros errores
+  const [stockErrorVariantId, setStockErrorVariantId] = useState<
+    string | null
+  >(null)
+  const [addToCartError, setAddToCartError] = useState("")
+
   const countryCode = useParams().countryCode as string
 
-  // If there is only 1 variant, preselect the options
+  // Si solo hay una variante, seleccionar sus opciones automáticamente
   useEffect(() => {
     if (product.variants?.length === 1) {
-      const variantOptions = optionsAsKeymap(product.variants[0].options)
+      const variantOptions = optionsAsKeymap(
+        product.variants[0].options
+      )
       setOptions(variantOptions ?? {})
     }
   }, [product.variants])
@@ -59,15 +73,25 @@ export default function ProductActions({
     })
   }, [product.variants, options])
 
-  // update the options when a variant is selected
+  // Determinar si la variante actual produjo un error de inventario
+  const stockError = Boolean(
+    selectedVariant?.id &&
+      stockErrorVariantId === selectedVariant.id
+  )
+
+  // Actualizar opciones cuando se selecciona una variante
   const setOptionValue = (optionId: string, value: string) => {
     setOptions((prev) => ({
       ...prev,
       [optionId]: value,
     }))
+
+    // Al cambiar la selección, limpiar el error anterior
+    setStockErrorVariantId(null)
+    setAddToCartError("")
   }
 
-  //check if the selected options produce a valid variant
+  // Comprobar si las opciones seleccionadas corresponden a una variante
   const isValidVariant = useMemo(() => {
     return product.variants?.some((v) => {
       const variantOptions = optionsAsKeymap(v.options)
@@ -92,19 +116,19 @@ export default function ProductActions({
     router.replace(pathname + "?" + params.toString())
   }, [selectedVariant, isValidVariant])
 
-  // check if the selected variant is in stock
+  // Comprobar disponibilidad de inventario de la variante
   const inStock = useMemo(() => {
-    // If we don't manage inventory, we can always add to cart
+    // Si no se administra el inventario, permitir agregar
     if (selectedVariant && !selectedVariant.manage_inventory) {
       return true
     }
 
-    // If we allow back orders on the variant, we can add to cart
+    // Si se permiten pedidos pendientes, permitir agregar
     if (selectedVariant?.allow_backorder) {
       return true
     }
 
-    // If there is inventory available, we can add to cart
+    // Si hay inventario disponible, permitir agregar
     if (
       selectedVariant?.manage_inventory &&
       (selectedVariant?.inventory_quantity || 0) > 0
@@ -112,27 +136,55 @@ export default function ProductActions({
       return true
     }
 
-    // Otherwise, we can't add to cart
     return false
   }, [selectedVariant])
 
-  const actionsRef = useRef<HTMLDivElement>(null)
+  // Disponibilidad efectiva: también considera errores del servidor
+  const canAddToCart = inStock && !stockError
 
+  const actionsRef = useRef<HTMLDivElement>(null)
   const inView = useIntersection(actionsRef, "0px")
 
-  // add the selected variant to the cart
+  // Agregar la variante seleccionada al carrito
   const handleAddToCart = async () => {
-    if (!selectedVariant?.id) return null
+    if (!selectedVariant?.id || !canAddToCart || isAdding) {
+      return
+    }
 
     setIsAdding(true)
+    setAddToCartError("")
 
-    await addToCart({
-      variantId: selectedVariant.id,
-      quantity: 1,
-      countryCode,
-    })
+    try {
+      await addToCart({
+        variantId: selectedVariant.id,
+        quantity: 1,
+        countryCode,
+      })
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message.toLowerCase()
+          : String(error).toLowerCase()
 
-    setIsAdding(false)
+      // Capturar el error específico de inventario de Medusa
+      if (
+        message.includes("required inventory") ||
+        message.includes("insufficient_inventory") ||
+        message.includes("insufficient inventory")
+      ) {
+        setStockErrorVariantId(selectedVariant.id)
+        setAddToCartError(
+          "No hay stock disponible para agregar más unidades de este producto."
+        )
+      } else {
+        setAddToCartError(
+          "No se pudo agregar el producto al carrito. Inténtalo de nuevo."
+        )
+      }
+    } finally {
+      // Evitar que el botón se quede cargando si la solicitud falla
+      setIsAdding(false)
+    }
   }
 
   return (
@@ -155,17 +207,21 @@ export default function ProductActions({
                   </div>
                 )
               })}
+
               <Divider />
             </div>
           )}
         </div>
 
-        <ProductPrice product={product} variant={selectedVariant} />
+        <ProductPrice
+          product={product}
+          variant={selectedVariant}
+        />
 
         <Button
           onClick={handleAddToCart}
           disabled={
-            !inStock ||
+            !canAddToCart ||
             !selectedVariant ||
             !!disabled ||
             isAdding ||
@@ -176,18 +232,30 @@ export default function ProductActions({
           isLoading={isAdding}
           data-testid="add-product-button"
         >
-          {!selectedVariant && !options
-            ? "Selecciona la variante"
-            : !inStock || !isValidVariant
+          {!selectedVariant || !isValidVariant
+            ? "Selecciona una variante"
+            : !canAddToCart
             ? "Sin stock"
             : "Añadir al carrito"}
         </Button>
+
+        {/* Mostrar mensajes sin provocar un error de ejecución */}
+        {addToCartError && (
+          <p
+            role="alert"
+            aria-live="polite"
+            className="mt-2 text-sm text-red-600"
+          >
+            {addToCartError}
+          </p>
+        )}
+
         <MobileActions
           product={product}
           variant={selectedVariant}
           options={options}
           updateOptions={setOptionValue}
-          inStock={inStock}
+          inStock={canAddToCart}
           handleAddToCart={handleAddToCart}
           isAdding={isAdding}
           show={!inView}
